@@ -27,17 +27,30 @@ const appLayout = document.querySelector<HTMLDivElement>('#app')!;
 const btnToggleSidebar = document.querySelector<HTMLButtonElement>('#btn-toggle-sidebar')!;
 const toggleIcon = btnToggleSidebar?.querySelector<HTMLSpanElement>('.toggle-icon');
 
+function setSidebarCollapsed(collapsed: boolean): void {
+  if (collapsed) {
+    appLayout.classList.add('sidebar-collapsed');
+  } else {
+    appLayout.classList.remove('sidebar-collapsed');
+  }
+  if (toggleIcon) {
+    toggleIcon.textContent = collapsed ? '⮞' : '⮜';
+  }
+
+  // Refresh Phaser canvas scaling after CSS transition finishes
+  setTimeout(() => {
+    refreshGameScale();
+  }, 320);
+}
+
+function toggleSidebar(): void {
+  const isCollapsed = !appLayout.classList.contains('sidebar-collapsed');
+  setSidebarCollapsed(isCollapsed);
+}
+
 if (btnToggleSidebar) {
   btnToggleSidebar.addEventListener('click', () => {
-    const isCollapsed = appLayout.classList.toggle('sidebar-collapsed');
-    if (toggleIcon) {
-      toggleIcon.textContent = isCollapsed ? '⮞' : '⮜';
-    }
-
-    // Refresh Phaser canvas scaling after CSS transition finishes
-    setTimeout(() => {
-      refreshGameScale();
-    }, 320);
+    toggleSidebar();
   });
 }
 
@@ -122,14 +135,20 @@ btnUnlock.addEventListener('click', async () => {
 // -------------------------------------------------------------
 btnPlay.addEventListener('click', async () => {
   try {
+    store.setPaused(false);
     await conductor.start();
+    btnPlay.classList.add('active');
+    btnPause.classList.remove('active');
   } catch (err) {
     console.error('Failed to start conductor:', err);
   }
 });
 
 btnPause.addEventListener('click', () => {
+  store.setPaused(true);
   conductor.pause();
+  btnPlay.classList.remove('active');
+  btnPause.classList.add('active');
 });
 
 btnStop.addEventListener('click', () => {
@@ -572,6 +591,28 @@ eventBus.on('TIP_COLLECTED', (_e) => {
   }
 });
 
+eventBus.on('BUFF_ACTIVATED', (e) => {
+  if (audioEngine.isReady) {
+    if (e.buff === 'tips') {
+      // Golden Sunflower: Double castanet chime flourish
+      percussion.triggerCastanet(undefined, 0.95);
+      flashChannelLed('percussion');
+    } else if (e.buff === 'balance') {
+      // Gypsy Brandy: Warm accordion harmonic chord
+      const chord = getTriadChord(conductor.scale, 5, 4);
+      accordion.triggerAttackRelease(chord, '4n', undefined, 0.85);
+      flashChannelLed('accordion');
+    } else if (e.buff === 'jump') {
+      // Steam & Invulnerability: Stomp & chord burst
+      percussion.triggerStomp(undefined, 0.9);
+      const chord = getTriadChord(conductor.scale, 1, 5);
+      accordion.triggerAttackRelease(chord, '8n', undefined, 0.9);
+      flashChannelLed('accordion');
+      flashChannelLed('percussion');
+    }
+  }
+});
+
 eventBus.on('PLAYER_STUMBLE', (_e) => {
   if (audioEngine.isReady) {
     percussion.triggerStomp(undefined, 0.95);
@@ -711,6 +752,26 @@ eventBus.on('RESTART_GAME', async () => {
     btnPause.classList.remove('active');
   } catch (err) {
     console.warn('[main] Error restarting conductor on RESTART_GAME:', err);
+  }
+});
+
+eventBus.on('UI_SET_SIDEBAR', (payload) => {
+  setSidebarCollapsed(payload.collapsed);
+});
+
+eventBus.on('GAME_PAUSE', async (payload) => {
+  if (payload.isPaused) {
+    conductor.pause();
+    btnPlay.classList.remove('active');
+    btnPause.classList.add('active');
+  } else {
+    try {
+      await conductor.start();
+      btnPlay.classList.add('active');
+      btnPause.classList.remove('active');
+    } catch (err) {
+      console.warn('[main] Error resuming conductor on GAME_PAUSE:', err);
+    }
   }
 });
 

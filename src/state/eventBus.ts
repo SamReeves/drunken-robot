@@ -8,7 +8,20 @@
 
 import type { InstrumentId } from '../audio/types.ts';
 
+export type BuffType = 'tips' | 'balance' | 'jump';
+
 export interface GameEventMap {
+  /** Fired when the robot collects a floating power-up */
+  BUFF_ACTIVATED: {
+    buff: BuffType;
+    duration: number;
+  };
+
+  /** Fired when an active buff runs out or is replaced */
+  BUFF_DEACTIVATED: {
+    buff: BuffType;
+  };
+
   /** Fired when the robot loses balance past critical stability threshold */
   PLAYER_STUMBLE: {
     direction: 'left' | 'right';
@@ -106,6 +119,16 @@ export interface GameEventMap {
 
   /** Fired when the player retries after game over */
   RESTART_GAME: Record<string, never>;
+
+  /** Fired when game pause state toggles */
+  GAME_PAUSE: {
+    isPaused: boolean;
+  };
+
+  /** Fired to request audio studio sidebar collapse or expansion */
+  UI_SET_SIDEBAR: {
+    collapsed: boolean;
+  };
 }
 
 export type GameEventType = keyof GameEventMap;

@@ -140,8 +140,10 @@ export class Robot extends Phaser.GameObjects.Container {
   }
 
   public getDynamicStabilityThreshold(): number {
-    const activeAct = store.getState().activeAct || 1;
-    return ACT_STABILITY_THRESHOLDS[activeAct] ?? 0.45;
+    const state = store.getState();
+    const activeAct = state.activeAct || 1;
+    const base = ACT_STABILITY_THRESHOLDS[activeAct] ?? 0.45;
+    return state.activeBuff === 'balance' ? base * 1.5 : base;
   }
 
   public getDynamicSwayTorque(): number {
@@ -223,7 +225,10 @@ export class Robot extends Phaser.GameObjects.Container {
     } else if (this.isChargingBellows) {
       // Space released -> Fire Accordion Jump if grounded or within coyote time
       if (canJump) {
-        const jumpForce = Robot.BASE_JUMP_FORCE + this.bellowsPressure * Robot.MAX_JUMP_BOOST;
+        const baseJump = store.getState().activeBuff === 'jump'
+          ? Robot.BASE_JUMP_FORCE * 2
+          : Robot.BASE_JUMP_FORCE;
+        const jumpForce = baseJump + this.bellowsPressure * Robot.MAX_JUMP_BOOST;
         this.body.setVelocityY(-jumpForce);
         this.coyoteTimer = 0;
 
@@ -501,32 +506,52 @@ export class Robot extends Phaser.GameObjects.Container {
     this.accordionGfx.fillRect(leftX - 4, accordionY - 11, 4, 22);
     this.accordionGfx.fillRect(leftX + accordionWidth, accordionY - 11, 4, 22);
 
-    // 6. Glowing Amber Vacuum Tube Eye
+    // 6. Glowing Amber/Cyan Vacuum Tube Eye & Buff Auras
     this.eyeGfx.clear();
     const eyeX = 4;
     const eyeY = -66;
     const eyeGlowPulse = 0.75 + Math.sin(this.wobblePhase * 2) * 0.25 + bellowsRatio * 0.8;
+    const activeBuff = store.getState().activeBuff;
+
+    // Buff-specific visual auras
+    if (activeBuff === 'jump') {
+      // Super Jump + Invulnerability: Electric cyan shield aura
+      this.eyeGfx.fillStyle(0x06b6d4, 0.22 * eyeGlowPulse);
+      this.eyeGfx.fillCircle(0, -48, 42);
+      this.eyeGfx.lineStyle(1.5, 0x67e8f9, 0.55 * eyeGlowPulse);
+      this.eyeGfx.strokeCircle(0, -48, 42);
+    } else if (activeBuff === 'balance') {
+      // Gypsy Brandy: Amber stabilization gyro rings around feet
+      this.eyeGfx.lineStyle(1.5, 0xf59e0b, 0.65);
+      this.eyeGfx.strokeEllipse(0, -8, 38, 12);
+    } else if (activeBuff === 'tips') {
+      // Golden Sunflower: Radiant golden halo around torso
+      this.eyeGfx.fillStyle(0xfbbf24, 0.18 * eyeGlowPulse);
+      this.eyeGfx.fillCircle(0, -48, 36);
+    }
 
     // Outer glass vacuum bulb
     this.eyeGfx.fillStyle(0x18181b, 0.85);
     this.eyeGfx.fillCircle(eyeX, eyeY, 8);
-    this.eyeGfx.lineStyle(2, 0xd97706, 0.9);
+    this.eyeGfx.lineStyle(2, activeBuff === 'jump' ? 0x22d3ee : 0xd97706, 0.9);
     this.eyeGfx.strokeCircle(eyeX, eyeY, 8);
 
-    // Radial warm amber halo
-    this.eyeGfx.fillStyle(0xf59e0b, 0.25 * eyeGlowPulse);
+    // Radial eye halo
+    const eyeHaloColor = activeBuff === 'jump' ? 0x06b6d4 : 0xf59e0b;
+    this.eyeGfx.fillStyle(eyeHaloColor, 0.25 * eyeGlowPulse);
     this.eyeGfx.fillCircle(eyeX, eyeY, 16 + bellowsRatio * 8);
 
-    // Inner fiery tungsten filament
-    this.eyeGfx.fillStyle(0xfef08a, 1);
+    // Inner fiery tungsten or electric cyan filament
+    this.eyeGfx.fillStyle(activeBuff === 'jump' ? 0xe0f2fe : 0xfef08a, 1);
     this.eyeGfx.fillCircle(eyeX, eyeY, 4);
     this.eyeGfx.fillStyle(0xffffff, 0.95);
     this.eyeGfx.fillCircle(eyeX - 1, eyeY - 1, 1.8);
 
     // 7. Render Steam Particles
     this.steamGfx.clear();
+    const steamColor = activeBuff === 'jump' ? 0x67e8f9 : 0xfef3c7;
     for (const p of this.steamParticles) {
-      this.steamGfx.fillStyle(0xfef3c7, p.alpha * 0.4);
+      this.steamGfx.fillStyle(steamColor, p.alpha * 0.45);
       this.steamGfx.fillCircle(p.x, p.y, p.radius);
     }
   }

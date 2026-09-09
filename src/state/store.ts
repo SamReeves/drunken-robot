@@ -1,5 +1,5 @@
 import type { InstrumentId, MeterType, ScaleName } from '../audio/types.ts';
-import { eventBus } from './eventBus.ts';
+import { eventBus, type BuffType } from './eventBus.ts';
 
 export interface GameState {
   tips: number;
@@ -12,6 +12,10 @@ export interface GameState {
   actName: string;
   game_over: boolean;
   victory: boolean;
+  isPaused: boolean;
+  activeBuff: BuffType | null;
+  buffTimeRemaining: number;
+  buffDuration: number;
 }
 
 export interface TierDefinition {
@@ -187,6 +191,10 @@ export class GameStore {
     actName: ACT_DEFINITIONS[0].name,
     game_over: false,
     victory: false,
+    isPaused: false,
+    activeBuff: null,
+    buffTimeRemaining: 0,
+    buffDuration: 0,
   };
 
   private listeners: Set<(state: GameState) => void> = new Set();
@@ -199,11 +207,74 @@ export class GameStore {
     return this.elapsedTime;
   }
 
-  public addTips(count = 1): void {
+  public isPaused(): boolean {
+    return this.state.isPaused;
+  }
+
+  public setPaused(isPaused: boolean): void {
     if (this.state.game_over || this.state.victory) return;
-    this.state.tips += count;
-    // Each tip collected grants a momentum surge (+8%)
-    this.adjustMomentum(8 * count);
+    if (this.state.isPaused === isPaused) return;
+
+    this.state.isPaused = isPaused;
+    eventBus.emit('GAME_PAUSE', { isPaused });
+    this.notify();
+  }
+
+  public togglePause(): boolean {
+    if (this.state.game_over || this.state.victory) return false;
+    this.setPaused(!this.state.isPaused);
+    return this.state.isPaused;
+  }
+
+  public activateBuff(type: BuffType, duration = 12): void {
+    if (this.state.game_over || this.state.victory) return;
+
+    if (this.state.activeBuff && this.state.activeBuff !== type) {
+      eventBus.emit('BUFF_DEACTIVATED', { buff: this.state.activeBuff });
+    }
+
+    this.state.activeBuff = type;
+    this.state.buffTimeRemaining = duration;
+    this.state.buffDuration = duration;
+
+    eventBus.emit('BUFF_ACTIVATED', {
+      buff: type,
+      duration,
+    });
+    this.notify();
+  }
+
+  public deactivateBuff(): void {
+    if (!this.state.activeBuff) return;
+
+    const prevBuff = this.state.activeBuff;
+    this.state.activeBuff = null;
+    this.state.buffTimeRemaining = 0;
+    this.state.buffDuration = 0;
+
+    eventBus.emit('BUFF_DEACTIVATED', { buff: prevBuff });
+    this.notify();
+  }
+
+  public updateBuffTimer(dt: number): void {
+    if (this.state.isPaused || this.state.game_over || this.state.victory) return;
+    if (!this.state.activeBuff) return;
+
+    this.state.buffTimeRemaining -= dt;
+    if (this.state.buffTimeRemaining <= 0) {
+      this.deactivateBuff();
+    } else {
+      this.notify();
+    }
+  }
+
+  public addTips(count = 1): void {
+    if (this.state.isPaused || this.state.game_over || this.state.victory) return;
+    const multiplier = this.state.activeBuff === 'tips' ? 2 : 1;
+    const earnedTips = count * multiplier;
+    this.state.tips += earnedTips;
+    // Each tip collected grants a momentum surge (+8% base, 2x with tips buff)
+    this.adjustMomentum(8 * earnedTips);
 
     eventBus.emit('TIP_COLLECTED', {
       x: 0,
@@ -214,7 +285,7 @@ export class GameStore {
   }
 
   public adjustMomentum(delta: number): void {
-    if (this.state.game_over || this.state.victory) return;
+    if (this.state.isPaused || this.state.game_over || this.state.victory) return;
 
     const prevMomentum = this.state.momentum;
     const prevTier = this.state.momentumTier;
@@ -261,8 +332,9 @@ export class GameStore {
   }
 
   public decayMomentum(dt: number): void {
-    if (this.state.game_over || this.state.victory) return;
+    if (this.state.isPaused || this.state.game_over || this.state.victory) return;
     this.elapsedTime += dt;
+    this.updateBuffTimer(dt);
 
     if (this.state.momentum > 0) {
       // Gentle continuous decay (-1.5% / sec)
@@ -273,7 +345,7 @@ export class GameStore {
   }
 
   public updateDistance(scrollX: number): void {
-    if (this.state.game_over || this.state.victory) return;
+    if (this.state.isPaused || this.state.game_over || this.state.victory) return;
     const distance = Math.max(0, Math.floor(scrollX));
     if (distance === this.state.distanceTraveled) return;
 
@@ -349,6 +421,10 @@ export class GameStore {
       actName: ACT_DEFINITIONS[0].name,
       game_over: false,
       victory: false,
+      isPaused: false,
+      activeBuff: null,
+      buffTimeRemaining: 0,
+      buffDuration: 0,
     };
     this.notify();
   }

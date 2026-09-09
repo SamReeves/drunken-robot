@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Robot, type RobotInputs } from '../entities/Robot.ts';
 import { store } from '../../state/store.ts';
-import { eventBus } from '../../state/eventBus.ts';
+import { eventBus, type BuffType } from '../../state/eventBus.ts';
 
 interface ParallaxLayer {
   name: 'sky' | 'distant' | 'midground' | 'street' | 'foreground';
@@ -18,7 +18,9 @@ export class StreetScene extends Phaser.Scene {
   // Object Pools & Groups
   private tipsGroup!: Phaser.Physics.Arcade.Group;
   private hazardsGroup!: Phaser.Physics.Arcade.Group;
+  private powerupsGroup!: Phaser.Physics.Arcade.Group;
   private nextSpawnX = 750;
+  private nextPowerupSpawnTime = 8000;
 
   // Keyboard Inputs
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -33,6 +35,8 @@ export class StreetScene extends Phaser.Scene {
   private hudProgressionGfx!: Phaser.GameObjects.Graphics;
   private actBadgeBg!: Phaser.GameObjects.Graphics;
   private actBadgeText!: Phaser.GameObjects.Text;
+  private activeBuffBadgeBg!: Phaser.GameObjects.Graphics;
+  private activeBuffBadgeText!: Phaser.GameObjects.Text;
   private bannerContainer!: Phaser.GameObjects.Container;
   private bannerBg!: Phaser.GameObjects.Graphics;
   private bannerTitleText!: Phaser.GameObjects.Text;
@@ -43,10 +47,16 @@ export class StreetScene extends Phaser.Scene {
 
   private isGameOver = false;
   private isVictory = false;
+  private isPaused = false;
+  private hasAutoCollapsedSidebar = false;
   private unsubActChange?: () => void;
   private unsubGameOver?: () => void;
   private unsubVictory?: () => void;
+  private unsubGamePause?: () => void;
   private gameOverOverlay?: Phaser.GameObjects.Container;
+  private pauseOverlay?: Phaser.GameObjects.Container;
+  private keyP?: Phaser.Input.Keyboard.Key;
+  private keyEsc?: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: 'StreetScene' });
@@ -58,16 +68,20 @@ export class StreetScene extends Phaser.Scene {
     this.nextSpawnX = 750;
     this.isGameOver = false;
     this.isVictory = false;
+    this.isPaused = store.isPaused();
+    this.hasAutoCollapsedSidebar = false;
+    this.nextPowerupSpawnTime = 8000;
 
     // 1. Create Parallax Layers pinned to camera viewport (setScrollFactor(0))
     const skyLayer = this.add.tileSprite(0, 0, width, height, 'bg_sky').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'sky', tileSprite: skyLayer, scrollSpeedFactor: 0.05, currentTint: 0xffffff });
+    this.layers.push({ name: 'sky', tileSprite: skyLayer, scrollSpeedFactor: 0.1, currentTint: 0xffffff });
 
-    const distLayer = this.add.tileSprite(0, 0, width, height, 'bg_distant').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'distant', tileSprite: distLayer, scrollSpeedFactor: 0.18, currentTint: 0xffffff });
+    const distantLayer = this.add.tileSprite(0, 0, width, height, 'bg_distant').setOrigin(0, 0).setScrollFactor(0);
+    this.layers.push({ name: 'distant', tileSprite: distantLayer, scrollSpeedFactor: 0.25, currentTint: 0xffffff });
 
-    const midLayer = this.add.tileSprite(0, 0, width, height, 'bg_midground').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'midground', tileSprite: midLayer, scrollSpeedFactor: 0.48, currentTint: 0xffffff });
+    const initialAct = store.getState().activeAct || 1;
+    const midLayer = this.add.tileSprite(0, 0, width, height, `bg_midground_act${initialAct}`).setOrigin(0, 0).setScrollFactor(0);
+    this.layers.push({ name: 'midground', tileSprite: midLayer, scrollSpeedFactor: 0.55, currentTint: 0xffffff });
 
     const streetLayer = this.add.tileSprite(0, 0, width, height, 'bg_street').setOrigin(0, 0).setScrollFactor(0);
     this.layers.push({ name: 'street', tileSprite: streetLayer, scrollSpeedFactor: 1.0, currentTint: 0xffffff });
@@ -80,7 +94,7 @@ export class StreetScene extends Phaser.Scene {
     this.groundPlatform.setOrigin(0, 0);
     this.physics.add.existing(this.groundPlatform, true);
 
-    // 3. Object Groups for Tips & Hazards
+    // 3. Object Groups for Tips, Hazards & Power-Ups
     this.tipsGroup = this.physics.add.group({
       allowGravity: false,
       immovable: true,
@@ -91,19 +105,25 @@ export class StreetScene extends Phaser.Scene {
       immovable: true,
     });
 
+    this.powerupsGroup = this.physics.add.group({
+      allowGravity: false,
+      immovable: true,
+    });
+
     // 4. Instantiate Robot Arcade Physics Entity
     this.robot = new Robot(this, 320, 520);
     this.physics.add.collider(this.robot, this.groundPlatform);
 
-    // 5. Overlap Handlers (Collecting Tips & Hitting Hazards)
+    // 5. Overlap Handlers (Collecting Tips, Hitting Hazards & Power-Ups)
     this.physics.add.overlap(this.robot, this.tipsGroup, this.handleCollectTip as any, undefined, this);
     this.physics.add.overlap(this.robot, this.hazardsGroup, this.handleHitHazard as any, undefined, this);
+    this.physics.add.overlap(this.robot, this.powerupsGroup, this.handleCollectPowerup as any, undefined, this);
 
     // 6. Smooth Camera Tracking & Vertical Axis Lock
     this.cameras.main.startFollow(this.robot, true, 0.08, 0.08, -140, 50);
     this.cameras.main.setBounds(0, 0, Number.MAX_SAFE_INTEGER, 720);
 
-    // 7. Setup Keyboard Input Controls (A/D/Left/Right/Space)
+    // 7. Setup Keyboard Input Controls (A/D/Left/Right/Space/P/ESC)
     this.setupInputControls();
 
     // 8. Setup Interactive HUD / Overlay UI & Act Banners
@@ -124,12 +144,20 @@ export class StreetScene extends Phaser.Scene {
       this.handleVictory();
     });
 
+    this.unsubGamePause = eventBus.on('GAME_PAUSE', (payload) => {
+      this.handlePauseChange(payload.isPaused);
+    });
+
     this.events.once('shutdown', this.cleanupListeners, this);
     this.events.once('destroy', this.cleanupListeners, this);
 
     // Apply initial act visual state
     const currentActDef = store.getCurrentActDefinition();
     this.applyInstantActPalette(currentActDef.act);
+
+    if (this.isPaused) {
+      this.handlePauseChange(true);
+    }
   }
 
   private setupInputControls(): void {
@@ -139,6 +167,11 @@ export class StreetScene extends Phaser.Scene {
       this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
       this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
       this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.keyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+      this.keyEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+      this.keyP.on('down', () => this.togglePause());
+      this.keyEsc.on('down', () => this.togglePause());
     }
   }
 
@@ -210,6 +243,15 @@ export class StreetScene extends Phaser.Scene {
     this.hudBellowsBar = this.add.graphics().setScrollFactor(0);
     this.hudBalanceGauge = this.add.graphics().setScrollFactor(0);
     this.hudProgressionGfx = this.add.graphics().setScrollFactor(0);
+
+    // Active Buff Indicator HUD Badge
+    this.activeBuffBadgeBg = this.add.graphics().setScrollFactor(0);
+    this.activeBuffBadgeText = this.add.text(32, 100, '', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+    }).setScrollFactor(0);
   }
 
   private drawBadgeBg(strokeColor: number): void {
@@ -224,6 +266,12 @@ export class StreetScene extends Phaser.Scene {
     const actDef = store.getActDefinition(act);
     if (!actDef) return;
 
+    // Hot-swap midground architecture texture key for active Act
+    const midLayer = this.layers.find((l) => l.name === 'midground');
+    if (midLayer) {
+      midLayer.tileSprite.setTexture(`bg_midground_act${act}`);
+    }
+
     for (const layer of this.layers) {
       const tintHex = actDef.visualPalette[layer.name] ?? 0xffffff;
       layer.tileSprite.setTint(tintHex);
@@ -234,6 +282,12 @@ export class StreetScene extends Phaser.Scene {
   private handleActTransition(act: number, name: string): void {
     const actDef = store.getActDefinition(act);
     if (!actDef) return;
+
+    // Hot-swap midground architecture texture key to match the new Act
+    const midLayer = this.layers.find((l) => l.name === 'midground');
+    if (midLayer) {
+      midLayer.tileSprite.setTexture(`bg_midground_act${act}`);
+    }
 
     // 1. Update Act Badge Text and Pulse Animation
     if (this.actBadgeText) {
@@ -311,11 +365,14 @@ export class StreetScene extends Phaser.Scene {
 
     const spawnX = this.nextSpawnX;
     const scenario = Phaser.Math.Between(0, 3);
+    const activeAct = store.getState().activeAct || 1;
+    const crateKey = `hazard_crate_act${activeAct}`;
+    const puddleKey = `hazard_puddle_act${activeAct}`;
 
     switch (scenario) {
       case 0: {
         // Crate Hazard on Ground + Parabolic Tip Arc
-        const crate = this.hazardsGroup.create(spawnX, 562, 'hazard_crate') as Phaser.Physics.Arcade.Sprite;
+        const crate = this.hazardsGroup.create(spawnX, 562, crateKey) as Phaser.Physics.Arcade.Sprite;
         crate.setOrigin(0.5, 0.5);
         (crate.body as Phaser.Physics.Arcade.Body)?.setSize(38, 38);
         crate.setData('hazardType', 'crate');
@@ -328,7 +385,7 @@ export class StreetScene extends Phaser.Scene {
       }
       case 1: {
         // Murky Puddle Hazard + High Bonus Tip
-        const puddle = this.hazardsGroup.create(spawnX, 576, 'hazard_puddle') as Phaser.Physics.Arcade.Sprite;
+        const puddle = this.hazardsGroup.create(spawnX, 576, puddleKey) as Phaser.Physics.Arcade.Sprite;
         puddle.setOrigin(0.5, 0.5);
         (puddle.body as Phaser.Physics.Arcade.Body)?.setSize(52, 14);
         puddle.setData('hazardType', 'puddle');
@@ -346,12 +403,12 @@ export class StreetScene extends Phaser.Scene {
       }
       case 3: {
         // Double Crate Hurdle (Tightened to 45px for single wide hurdle) + Jump Arc (4 tips)
-        const crate1 = this.hazardsGroup.create(spawnX, 562, 'hazard_crate') as Phaser.Physics.Arcade.Sprite;
+        const crate1 = this.hazardsGroup.create(spawnX, 562, crateKey) as Phaser.Physics.Arcade.Sprite;
         crate1.setOrigin(0.5, 0.5);
         (crate1.body as Phaser.Physics.Arcade.Body)?.setSize(38, 38);
         crate1.setData('hazardType', 'crate');
 
-        const crate2 = this.hazardsGroup.create(spawnX + 45, 562, 'hazard_crate') as Phaser.Physics.Arcade.Sprite;
+        const crate2 = this.hazardsGroup.create(spawnX + 45, 562, crateKey) as Phaser.Physics.Arcade.Sprite;
         crate2.setOrigin(0.5, 0.5);
         (crate2.body as Phaser.Physics.Arcade.Body)?.setSize(38, 38);
         crate2.setData('hazardType', 'crate');
@@ -414,9 +471,104 @@ export class StreetScene extends Phaser.Scene {
     });
   }
 
+  private handleCollectPowerup(_robot: any, powerupObj: any): void {
+    const powerup = powerupObj as Phaser.Physics.Arcade.Sprite;
+    if (!powerup.active) return;
+
+    const px = powerup.x;
+    const py = powerup.y;
+    const buffType = powerup.getData('buffType') as BuffType;
+
+    powerup.disableBody(true, true);
+    powerup.destroy();
+
+    // Activate 12-second gameplay buff
+    store.activateBuff(buffType, 12);
+
+    let indicator = 'POWER UP!';
+    let textColor = '#ffffff';
+
+    switch (buffType) {
+      case 'tips':
+        indicator = '2X TIPS! 🌻';
+        textColor = '#fbbf24';
+        break;
+      case 'balance':
+        indicator = '+50% STABILITY! 🍾';
+        textColor = '#34d399';
+        break;
+      case 'jump':
+        indicator = 'SUPER JUMP & SHIELD! ⚡';
+        textColor = '#38bdf8';
+        break;
+    }
+
+    // Floating text indicator
+    const floatText = this.add.text(px, py - 15, indicator, {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '15px',
+      color: textColor,
+      fontStyle: 'bold',
+      stroke: '#18181b',
+      strokeThickness: 3,
+    }).setOrigin(0.5, 0.5);
+
+    this.tweens.add({
+      targets: floatText,
+      y: py - 60,
+      alpha: 0,
+      duration: 900,
+      ease: 'Cubic.easeOut',
+      onComplete: () => floatText.destroy(),
+    });
+  }
+
   private handleHitHazard(_robot: any, hazardObj: any): void {
     const hazard = hazardObj as Phaser.Physics.Arcade.Sprite;
     if (!hazard.active || hazard.getData('hit')) return;
+
+    // Super Jump & Hazard Invulnerability Buff Bypass
+    if (store.getState().activeBuff === 'jump') {
+      hazard.setData('hit', true);
+      const hx = hazard.x;
+      const hy = hazard.y;
+
+      // Shatter hazard with electric cyan energy
+      hazard.setTint(0x38bdf8);
+      this.tweens.add({
+        targets: hazard,
+        alpha: 0,
+        y: hy - 45,
+        angle: 75,
+        scaleX: 0.6,
+        scaleY: 0.6,
+        duration: 400,
+        ease: 'Cubic.easeIn',
+        onComplete: () => hazard.destroy(),
+      });
+
+      // Floating "SMASHED! ⚡" feedback indicator
+      const smashText = this.add.text(hx, hy - 25, 'SMASHED! ⚡', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        color: '#38bdf8',
+        fontStyle: 'bold',
+        stroke: '#082f49',
+        strokeThickness: 3,
+      }).setOrigin(0.5, 0.5);
+
+      this.tweens.add({
+        targets: smashText,
+        y: hy - 58,
+        alpha: 0,
+        duration: 650,
+        ease: 'Power2',
+        onComplete: () => smashText.destroy(),
+      });
+
+      // Completely bypass stumble, camera shake, and momentum penalties!
+      return;
+    }
 
     hazard.setData('hit', true);
     hazard.setTint(0xef4444);
@@ -465,6 +617,13 @@ export class StreetScene extends Phaser.Scene {
     });
 
     this.hazardsGroup.getChildren().forEach((child) => {
+      const sprite = child as Phaser.Physics.Arcade.Sprite;
+      if (sprite.x < despawnX) {
+        sprite.destroy();
+      }
+    });
+
+    this.powerupsGroup.getChildren().forEach((child) => {
       const sprite = child as Phaser.Physics.Arcade.Sprite;
       if (sprite.x < despawnX) {
         sprite.destroy();
@@ -547,10 +706,110 @@ export class StreetScene extends Phaser.Scene {
       this.statusText.setText('A / D (← / →) : Balance Torque | Hold Space : Accordion Jump');
       this.statusText.setColor('#d1d5db');
     }
+
+    // 4. Active Buff Indicator (Under Act Badge at top-left)
+    this.activeBuffBadgeBg.clear();
+    if (gameState.activeBuff && gameState.buffTimeRemaining > 0) {
+      const remainingSec = Math.ceil(gameState.buffTimeRemaining);
+      let buffTitle = '';
+      let badgeStroke = 0xf59e0b;
+      let badgeFill = 0x271900;
+      let textColor = '#fbbf24';
+
+      switch (gameState.activeBuff) {
+        case 'tips':
+          buffTitle = `🌻 2X TIPS (${remainingSec}s)`;
+          badgeStroke = 0xf59e0b;
+          badgeFill = 0x271900;
+          textColor = '#fbbf24';
+          break;
+        case 'balance':
+          buffTitle = `🍾 +50% STABILITY (${remainingSec}s)`;
+          badgeStroke = 0x10b981;
+          badgeFill = 0x022c22;
+          textColor = '#34d399';
+          break;
+        case 'jump':
+          buffTitle = `⚡ SUPER JUMP & SHIELD (${remainingSec}s)`;
+          badgeStroke = 0x06b6d4;
+          badgeFill = 0x082f49;
+          textColor = '#38bdf8';
+          break;
+      }
+
+      const badgeX = 20;
+      const badgeY = 96;
+      const badgeW = 220;
+      const badgeH = 26;
+
+      this.activeBuffBadgeBg.fillStyle(badgeFill, 0.92);
+      this.activeBuffBadgeBg.fillRoundedRect(badgeX, badgeY, badgeW, badgeH, 6);
+      this.activeBuffBadgeBg.lineStyle(1.5, badgeStroke, 0.9);
+      this.activeBuffBadgeBg.strokeRoundedRect(badgeX, badgeY, badgeW, badgeH, 6);
+
+      // Remaining duration bar beneath text
+      const progressRatio = Phaser.Math.Clamp(gameState.buffTimeRemaining / (gameState.buffDuration || 12), 0, 1);
+      this.activeBuffBadgeBg.fillStyle(badgeStroke, 0.7);
+      this.activeBuffBadgeBg.fillRoundedRect(badgeX + 4, badgeY + badgeH - 4, (badgeW - 8) * progressRatio, 2, 1);
+
+      this.activeBuffBadgeText.setText(buffTitle);
+      this.activeBuffBadgeText.setColor(textColor);
+      this.activeBuffBadgeText.setPosition(badgeX + 10, badgeY + 6);
+      this.activeBuffBadgeText.setVisible(true);
+    } else {
+      this.activeBuffBadgeText.setVisible(false);
+    }
+  }
+
+  private spawnFloatingPowerups(time: number): void {
+    if (time < this.nextPowerupSpawnTime) return;
+
+    // Low-chance check: 40% chance every check cycle
+    if (Math.random() > 0.4) {
+      this.nextPowerupSpawnTime = time + 2500;
+      return;
+    }
+
+    // Interval between 14 and 22 seconds
+    this.nextPowerupSpawnTime = time + Phaser.Math.Between(14000, 22000);
+
+    const cameraRightEdge = this.cameras.main.scrollX + this.scale.width + 60;
+    const baseY = Phaser.Math.Between(410, 490);
+
+    const buffTypes: BuffType[] = ['tips', 'balance', 'jump'];
+    const selectedBuff = Phaser.Utils.Array.GetRandom(buffTypes);
+
+    let textureKey = 'powerup_sunflower';
+    if (selectedBuff === 'balance') textureKey = 'powerup_brandy';
+    else if (selectedBuff === 'jump') textureKey = 'powerup_steam';
+
+    const powerup = this.powerupsGroup.create(cameraRightEdge, baseY, textureKey) as Phaser.Physics.Arcade.Sprite;
+    powerup.setOrigin(0.5, 0.5);
+    (powerup.body as Phaser.Physics.Arcade.Body)?.setSize(28, 28);
+    powerup.setData('buffType', selectedBuff);
+    powerup.setData('baseY', baseY);
+    powerup.setData('phaseOffset', Math.random() * Math.PI * 2);
+
+    // Drifting leftward at autoWalkSpeed * 1.5
+    (powerup.body as Phaser.Physics.Arcade.Body)?.setVelocityX(-Robot.AUTO_WALK_SPEED * 1.5);
+  }
+
+  private updatePowerupSinusoidalDrift(time: number): void {
+    this.powerupsGroup.getChildren().forEach((child) => {
+      const powerup = child as Phaser.Physics.Arcade.Sprite;
+      if (powerup.active) {
+        const baseY = powerup.getData('baseY') as number;
+        const phase = (powerup.getData('phaseOffset') as number) || 0;
+        // Sinusoidal vertical bobbing
+        powerup.y = baseY + Math.sin(time * 0.0035 + phase) * 32;
+        // Maintain leftward velocity
+        (powerup.body as Phaser.Physics.Arcade.Body)?.setVelocityX(-Robot.AUTO_WALK_SPEED * 1.5);
+      }
+    });
   }
 
   override update(time: number, delta: number): void {
-    if (this.isGameOver || this.isVictory) return;
+    if (this.isGameOver || this.isVictory || this.isPaused) return;
 
     const dt = Math.min(delta / 1000, 0.1);
 
@@ -573,8 +832,10 @@ export class StreetScene extends Phaser.Scene {
       this.robot.update(time, delta, inputs);
     }
 
-    // 4. Procedural Spawner & Recycling
+    // 4. Procedural Spawner, Power-Up Wave & Recycling
     this.spawnObstaclesAndTips();
+    this.spawnFloatingPowerups(time);
+    this.updatePowerupSinusoidalDrift(time);
     this.recycleOffscreenEntities();
 
     // 5. Update Parallax Background Layers based on camera position
@@ -585,6 +846,12 @@ export class StreetScene extends Phaser.Scene {
 
     // 6. Update Distance Progression in State Store
     store.updateDistance(cameraScrollX);
+
+    // Auto-collapse audio studio rack once player crosses 1,200px in Act 1 for full-screen view
+    if (!this.hasAutoCollapsedSidebar && store.getState().distanceTraveled >= 1200) {
+      this.hasAutoCollapsedSidebar = true;
+      eventBus.emit('UI_SET_SIDEBAR', { collapsed: true });
+    }
 
     // 7. Update HUD
     this.updateHUD(this.scale.width);
@@ -723,6 +990,196 @@ export class StreetScene extends Phaser.Scene {
     });
   }
 
+  public togglePause(): void {
+    if (this.isGameOver || this.isVictory) return;
+    store.togglePause();
+  }
+
+  private handlePauseChange(paused: boolean): void {
+    if (this.isGameOver || this.isVictory) return;
+    if (this.isPaused === paused && !paused && !this.pauseOverlay) return;
+
+    this.isPaused = paused;
+
+    if (paused) {
+      this.physics.pause();
+      if (this.robot) {
+        this.tweens.getTweensOf(this.robot).forEach((t) => t.pause());
+      }
+      this.showPauseOverlay();
+    } else {
+      this.physics.resume();
+      if (this.robot) {
+        this.tweens.getTweensOf(this.robot).forEach((t) => t.resume());
+      }
+      this.hidePauseOverlay();
+    }
+  }
+
+  private showPauseOverlay(): void {
+    if (this.pauseOverlay) return;
+
+    const { width, height } = this.scale;
+    const overlay = this.add.container(width / 2, height / 2).setScrollFactor(0).setDepth(250);
+
+    // Darkened backdrop
+    const backdrop = this.add.graphics();
+    backdrop.fillStyle(0x05070e, 0.85);
+    backdrop.fillRect(-width / 2, -height / 2, width, height);
+
+    // Card frame
+    const card = this.add.graphics();
+    card.fillStyle(0x18181b, 0.96);
+    card.fillRoundedRect(-240, -165, 480, 330, 16);
+    card.lineStyle(2, 0xf59e0b, 0.9);
+    card.strokeRoundedRect(-240, -165, 480, 330, 16);
+
+    const title = this.add
+      .text(0, -118, 'GAME PAUSED', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: '#f59e0b',
+        letterSpacing: 2,
+      })
+      .setOrigin(0.5);
+
+    const desc = this.add
+      .text(0, -74, 'The automaton rests its weary brass gears.\nRhythm and journey are temporarily suspended.', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+        color: '#cbd5e1',
+        align: 'center',
+        lineSpacing: 4,
+      })
+      .setOrigin(0.5);
+
+    const state = store.getState();
+    const stats = this.add
+      .text(
+        0,
+        -22,
+        `Act ${state.activeAct}: ${state.actName.toUpperCase()}  •  Distance: ${Math.floor(state.distanceTraveled)} px  •  Tips: ${state.tips} ⚙️`,
+        {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#fbbf24',
+        }
+      )
+      .setOrigin(0.5);
+
+    // 1. Resume Button
+    const btnResumeContainer = this.add.container(0, 32);
+    const resumeGlow = this.add.graphics();
+    resumeGlow.fillStyle(0xd97706, 0.25);
+    resumeGlow.fillRoundedRect(-130, -22, 260, 44, 22);
+
+    const resumeBg = this.add.graphics();
+    resumeBg.fillGradientStyle(0xd97706, 0xd97706, 0xb45309, 0x92400e, 1);
+    resumeBg.fillRoundedRect(-120, -18, 240, 36, 18);
+    resumeBg.lineStyle(2, 0xfde68a, 0.85);
+    resumeBg.strokeRoundedRect(-120, -18, 240, 36, 18);
+
+    const resumeText = this.add
+      .text(0, 0, '▶ RESUME', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '15px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        letterSpacing: 1.5,
+      })
+      .setOrigin(0.5);
+
+    btnResumeContainer.add([resumeGlow, resumeBg, resumeText]);
+
+    const resumeHit = this.add
+      .zone(0, 32, 240, 36)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    resumeHit.on('pointerdown', () => {
+      store.setPaused(false);
+    });
+
+    // 2. Restart Button
+    const btnRestartContainer = this.add.container(0, 84);
+    const restartBg = this.add.graphics();
+    restartBg.fillStyle(0x27272a, 0.95);
+    restartBg.fillRoundedRect(-120, -18, 240, 36, 18);
+    restartBg.lineStyle(1, 0x71717a, 0.8);
+    restartBg.strokeRoundedRect(-120, -18, 240, 36, 18);
+
+    const restartText = this.add
+      .text(0, 0, '🔄 RESTART JOURNEY', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#e4e4e7',
+        letterSpacing: 1,
+      })
+      .setOrigin(0.5);
+
+    btnRestartContainer.add([restartBg, restartText]);
+
+    const restartHit = this.add
+      .zone(0, 84, 240, 36)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    const restartAction = (): void => {
+      this.hidePauseOverlay();
+      store.setPaused(false);
+      store.reset();
+      eventBus.emit('RESTART_GAME', {});
+      this.scene.restart();
+    };
+
+    restartHit.on('pointerdown', restartAction);
+
+    // Keyboard shortcut hint
+    const hint = this.add
+      .text(0, 130, '[P] or [ESC] : Resume   •   [R] : Restart', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#9ca3af',
+      })
+      .setOrigin(0.5);
+
+    const onKeyR = (event: KeyboardEvent) => {
+      if (event.code === 'KeyR' && this.isPaused) {
+        window.removeEventListener('keydown', onKeyR);
+        restartAction();
+      }
+    };
+    window.addEventListener('keydown', onKeyR);
+
+    overlay.once('destroy', () => {
+      window.removeEventListener('keydown', onKeyR);
+    });
+
+    overlay.add([
+      backdrop,
+      card,
+      title,
+      desc,
+      stats,
+      btnResumeContainer,
+      resumeHit,
+      btnRestartContainer,
+      restartHit,
+      hint,
+    ]);
+
+    this.pauseOverlay = overlay;
+  }
+
+  private hidePauseOverlay(): void {
+    if (this.pauseOverlay) {
+      this.pauseOverlay.destroy();
+      this.pauseOverlay = undefined;
+    }
+  }
+
   private cleanupListeners(): void {
     if (this.unsubActChange) {
       this.unsubActChange();
@@ -736,9 +1193,20 @@ export class StreetScene extends Phaser.Scene {
       this.unsubVictory();
       this.unsubVictory = undefined;
     }
+    if (this.unsubGamePause) {
+      this.unsubGamePause();
+      this.unsubGamePause = undefined;
+    }
     if (this.gameOverOverlay) {
       this.gameOverOverlay.destroy();
       this.gameOverOverlay = undefined;
+    }
+    this.hidePauseOverlay();
+    if (this.keyP) {
+      this.keyP.removeAllListeners();
+    }
+    if (this.keyEsc) {
+      this.keyEsc.removeAllListeners();
     }
   }
 }
