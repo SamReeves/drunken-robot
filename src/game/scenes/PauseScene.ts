@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { store } from '../../state/store.ts';
 import { SceneKeys } from './keys.ts';
 import type { StreetScene } from './StreetScene.ts';
+import { formatClock, formatMetres } from './HudScene.ts';
 
 /**
  * PauseScene - launched on top of a paused StreetScene. Resume and restart
@@ -51,7 +52,7 @@ export class PauseScene extends Phaser.Scene {
       .text(
         cx,
         cy - 40,
-        `Act ${state.activeAct}: ${state.actName}  •  ${Math.floor(state.distanceTraveled)} px  •  ${state.tips} ⚙️`,
+        `Act ${state.activeAct}: ${state.actName}  •  ${formatMetres(state.distanceTraveled)}  •  ${formatClock(store.getElapsedTime())}  •  ${state.tips} ⚙️`,
         { fontFamily: 'monospace', fontSize: '14px', color: '#fbbf24' },
       )
       .setOrigin(0.5);

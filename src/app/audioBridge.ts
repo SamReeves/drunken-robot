@@ -69,11 +69,21 @@ export function createAudioBridge(): AudioBridge {
       case 'balance':
         accordion.triggerAttackRelease(getTriadChord(conductor.scale, 5, 4), '4n', undefined, 0.85);
         break;
-      case 'jump':
+      case 'steam':
         percussion.triggerStomp(undefined, 0.9);
         accordion.triggerAttackRelease(getTriadChord(conductor.scale, 1, 5), '8n', undefined, 0.9);
         break;
+      case 'shield':
+        percussion.triggerMetal(undefined, 0.8);
+        percussion.triggerCastanet(undefined, 0.7);
+        break;
     }
+  });
+
+  eventBus.on('SHIELD_BLOCKED', () => {
+    if (!audioEngine.isReady) return;
+    percussion.triggerMetal(undefined, 0.9);
+    percussion.triggerStomp(undefined, 0.6);
   });
 
   eventBus.on('PLAYER_STUMBLE', () => {

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { store } from '../../state/store.ts';
 import { eventBus } from '../../state/eventBus.ts';
 import { SceneKeys, type EndSceneData } from './keys.ts';
+import { formatMetres } from './HudScene.ts';
 
 const FONT_SANS = 'system-ui, -apple-system, sans-serif';
 
@@ -249,17 +250,18 @@ export class EndScene extends Phaser.Scene {
 
     const statsBox = this.add.graphics();
     statsBox.fillStyle(0x1e293b, 0.7);
-    statsBox.fillRoundedRect(panelX - 210, 236, 420, 190, 12);
+    statsBox.fillRoundedRect(panelX - 210, 236, 420, 224, 12);
     statsBox.lineStyle(1, 0x475569, 0.8);
-    statsBox.strokeRoundedRect(panelX - 210, 236, 420, 190, 12);
+    statsBox.strokeRoundedRect(panelX - 210, 236, 420, 224, 12);
 
     const d = this.runData;
     const stats = [
       { label: 'Tips busked', value: `${d.tips} ⚙️`, color: '#fef08a' },
-      { label: 'Distance', value: `${Math.floor(d.distanceTraveled)} px`, color: '#67e8f9' },
+      { label: 'Distance', value: formatMetres(d.distanceTraveled), color: '#67e8f9' },
       { label: 'Time on the road', value: formatTime(d.elapsedSec), color: '#c4b5fd' },
       { label: victory ? 'Final act' : 'Fell in', value: `Act ${d.act}: ${d.actName}`, color: '#f472b6' },
       { label: 'Ensemble', value: d.tierName, color: '#a7f3d0' },
+      { label: 'Seed', value: `${d.seed}  (add ?seed=${d.seed} to replay)`, color: '#94a3b8' },
     ];
     stats.forEach((st, idx) => {
       const rowY = 252 + idx * 34;
@@ -280,7 +282,7 @@ export class EndScene extends Phaser.Scene {
     });
 
     // Play again
-    const btnY = 490;
+    const btnY = 510;
     const btnBg = this.add.graphics();
     btnBg.fillStyle(victory ? 0x059669 : 0xd97706, 1);
     btnBg.fillRoundedRect(panelX - 145, btnY - 24, 290, 48, 24);

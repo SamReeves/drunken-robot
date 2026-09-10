@@ -132,3 +132,32 @@ export function drawPowerupSteam(gfx: Phaser.GameObjects.Graphics): void {
     gfx.fillCircle(cx + Math.cos(a) * 6.5, cy + Math.sin(a) * 6.5, 0.9);
   }
 }
+
+/** Brass shield: a riveted disc with a cyan glow, for the one-hit hazard shield. */
+export function drawPowerupShield(gfx: Phaser.GameObjects.Graphics): void {
+  const cx = 16;
+  const cy = 16;
+  gfx.fillStyle(0x06b6d4, 0.18);
+  gfx.fillCircle(cx, cy, 15);
+  gfx.fillStyle(0x0e7490, 1);
+  gfx.fillCircle(cx, cy, 11);
+  gfx.fillStyle(0xb45309, 1);
+  gfx.beginPath();
+  gfx.moveTo(cx, cy - 10);
+  gfx.lineTo(cx + 8, cy - 6);
+  gfx.lineTo(cx + 7, cy + 4);
+  gfx.lineTo(cx, cy + 10);
+  gfx.lineTo(cx - 7, cy + 4);
+  gfx.lineTo(cx - 8, cy - 6);
+  gfx.closePath();
+  gfx.fillPath();
+  gfx.lineStyle(1.5, 0x18181b, 0.95);
+  gfx.strokePath();
+  gfx.fillStyle(0xfbbf24, 0.95);
+  gfx.fillCircle(cx, cy - 6, 1.4);
+  gfx.fillCircle(cx + 5, cy - 3, 1.4);
+  gfx.fillCircle(cx - 5, cy - 3, 1.4);
+  gfx.fillCircle(cx, cy + 4, 1.4);
+  gfx.lineStyle(1.2, 0x67e8f9, 0.9);
+  gfx.strokeCircle(cx, cy, 11);
+}

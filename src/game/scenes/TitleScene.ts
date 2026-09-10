@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { audioEngine } from '../../audio/engine.ts';
 import { eventBus } from '../../state/eventBus.ts';
 import { store } from '../../state/store.ts';
+import type { AppFlags } from '../../app/flags.ts';
 
 /**
  * TitleScene - Entry Title & Audio Context Unlock Screen
@@ -220,7 +221,18 @@ export class TitleScene extends Phaser.Scene {
         .setOrigin(0.5);
     });
 
-    // 9. Audio Notice Footer
+    // 9. Run seed: from ?seed= if given, otherwise fresh. Shown so a run can be shared and replayed.
+    const flags = this.registry.get('flags') as AppFlags | undefined;
+    const seed = flags?.seed ?? Math.floor(Math.random() * 1_000_000);
+    this.add
+      .text(width / 2, 626, `Seed ${seed}   •   add ?seed=${seed} to the URL to replay this street`, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#6b7280',
+      })
+      .setOrigin(0.5);
+
+    // 10. Audio Notice Footer
     this.add
       .text(width / 2, 650, '🎧 Headphones recommended for spatial gypsy-jazz audio and musette beating', {
         fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -243,9 +255,9 @@ export class TitleScene extends Phaser.Scene {
         console.warn('[TitleScene] Audio context init warning:', err);
       }
 
-      // Fresh run state. reset() announces Act 1 so the conductor picks up the
+      // Fresh run state. startRun() announces Act 1 so the conductor picks up the
       // act's scale/meter/bpm instead of playing its constructor defaults.
-      store.reset();
+      store.startRun(seed);
       eventBus.emit('GAME_START', {});
 
       // Fade camera smoothly to StreetScene

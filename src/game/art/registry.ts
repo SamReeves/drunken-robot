@@ -4,7 +4,7 @@ import { drawDistant } from './layers/distant.ts';
 import { drawStreet } from './layers/street.ts';
 import { drawForeground } from './layers/foreground.ts';
 import { drawTipGear } from './items.ts';
-import { drawPowerupSunflower, drawPowerupBrandy, drawPowerupSteam } from './powerups.ts';
+import { drawPowerupSunflower, drawPowerupBrandy, drawPowerupSteam, drawPowerupShield } from './powerups.ts';
 import {
   drawCrateAct1,
   drawCrateAct2,
@@ -40,6 +40,7 @@ export const CORE_TEXTURES: TextureSpec[] = [
   { key: 'powerup_sunflower', width: 32, height: 32, draw: drawPowerupSunflower },
   { key: 'powerup_brandy', width: 32, height: 32, draw: drawPowerupBrandy },
   { key: 'powerup_steam', width: 32, height: 32, draw: drawPowerupSteam },
+  { key: 'powerup_shield', width: 32, height: 32, draw: drawPowerupShield },
   { key: 'hazard_crate_act1', width: 44, height: 44, draw: drawCrateAct1 },
   { key: 'hazard_crate_act2', width: 44, height: 44, draw: drawCrateAct2 },
   { key: 'hazard_crate_act3', width: 44, height: 44, draw: drawCrateAct3 },

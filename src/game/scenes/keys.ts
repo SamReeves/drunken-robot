@@ -30,4 +30,5 @@ export interface EndSceneData {
   act: number;
   actName: string;
   elapsedSec: number;
+  seed: number;
 }

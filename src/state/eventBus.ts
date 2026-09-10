@@ -4,8 +4,10 @@
  */
 
 import type { InstrumentId } from '../audio/types.ts';
+import type { StumbleCause } from '../game/balance.ts';
 
-export type BuffType = 'tips' | 'balance' | 'jump';
+/** Timed buffs plus the shield, which is a stored charge rather than a timer. */
+export type BuffType = 'tips' | 'balance' | 'steam' | 'shield';
 
 export interface GameEventMap {
   /** Fired when the robot collects a floating power-up */
@@ -25,6 +27,19 @@ export interface GameEventMap {
     severity: number; // 0.0 to 1.0
     tiltAngle: number; // in radians
     speed: number;
+    /** What knocked the robot over; decides the momentum cost. */
+    cause: StumbleCause;
+  };
+
+  /** Fired GUST_WARNING_SEC before a gust of wind shoves the robot. */
+  GUST_WARNING: {
+    direction: 'left' | 'right';
+    inSec: number;
+  };
+
+  /** Fired when a shield charge absorbs a hazard instead of a stumble. */
+  SHIELD_BLOCKED: {
+    hazardType: 'crate' | 'puddle';
   };
 
   /** Fired continuously as the player charges accordion bellows pressure */

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUFFS, MOMENTUM, TIER } from '../game/balance.ts';
 import { eventBus, type GameEventMap } from './eventBus.ts';
-import { ACT_DEFINITIONS, GameStore, TIERS, VICTORY_DISTANCE } from './store.ts';
+import { ACT_DEFINITIONS, GameStore, VICTORY_DISTANCE } from './store.ts';
 
 describe('GameStore', () => {
   let store: GameStore;
@@ -8,13 +9,25 @@ describe('GameStore', () => {
   beforeEach(() => {
     eventBus.clear();
     store = new GameStore();
+    store.startRun(1234);
   });
 
-  it('reset() announces Act 1 so audio and visuals re-apply its config', () => {
+  it('startRun() announces Act 1 and stores the seed', () => {
     const onAct = vi.fn();
     eventBus.on('ACT_CHANGE', onAct);
-    store.reset();
+    store.startRun(99);
     expect(onAct).toHaveBeenCalledWith({ act: 1, name: ACT_DEFINITIONS[0].name });
+    expect(store.getState().seed).toBe(99);
+    expect(store.getState().momentum).toBe(MOMENTUM.start);
+    expect(store.getState().momentumTier).toBe(0);
+  });
+
+  it('reset() replays the same seed', () => {
+    store.startRun(7);
+    store.addTips(3);
+    store.reset();
+    expect(store.getState().seed).toBe(7);
+    expect(store.getState().tips).toBe(0);
   });
 
   it('advances acts at each minDistance threshold, in order', () => {
@@ -38,18 +51,16 @@ describe('GameStore', () => {
     expect(store.getState().victory).toBe(true);
   });
 
-  it('does not end the game on zero momentum inside the 10 s grace period', () => {
+  it('does not end the game on zero momentum inside the grace period', () => {
     const onGameOver = vi.fn();
     eventBus.on('GAME_OVER', onGameOver);
     store.adjustMomentum(-100);
     expect(store.getState().momentum).toBe(0);
     expect(onGameOver).not.toHaveBeenCalled();
 
-    // 9 seconds of decay: still in grace
-    for (let i = 0; i < 9; i++) store.decayMomentum(1);
+    for (let i = 0; i < MOMENTUM.deathGraceSec - 1; i++) store.decayMomentum(1);
     expect(onGameOver).not.toHaveBeenCalled();
 
-    // crossing 10 s with zero momentum ends the run
     store.decayMomentum(1);
     expect(onGameOver).toHaveBeenCalledTimes(1);
     expect(store.getState().game_over).toBe(true);
@@ -57,7 +68,7 @@ describe('GameStore', () => {
 
   it('coalesces high-frequency mutations into one notification per flush()', () => {
     const listener = vi.fn();
-    store.subscribe(listener); // subscribe delivers once immediately
+    store.subscribe(listener);
     listener.mockClear();
 
     for (let i = 0; i < 60; i++) {
@@ -68,22 +79,49 @@ describe('GameStore', () => {
 
     store.flush();
     expect(listener).toHaveBeenCalledTimes(1);
-
     store.flush();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('notifies immediately on discrete transitions such as a tier change', () => {
+  it('promotes a tier as soon as tips and momentum both qualify, and notifies immediately', () => {
     const listener = vi.fn();
     const onTier = vi.fn<(e: GameEventMap['TIER_CHANGE']) => void>();
     store.subscribe(listener);
     listener.mockClear();
     eventBus.on('TIER_CHANGE', onTier);
 
-    store.adjustMomentum(100);
+    // Momentum alone is not enough
+    store.adjustMomentum(60);
+    expect(onTier).not.toHaveBeenCalled();
+
+    // Enough tips for tier 1 (momentum is already above its gate)
+    store.addTips(TIER.tipCost[1]);
     expect(onTier).toHaveBeenCalledTimes(1);
-    expect(onTier.mock.calls[0][0].tier).toBe(TIERS[TIERS.length - 1].tier);
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(onTier.mock.calls[0][0].tier).toBe(1);
+    expect(listener).toHaveBeenCalled();
+  });
+
+  it('demotes only after momentum dwells under the drop line', () => {
+    store.addTips(TIER.tipCost[2]);
+    store.adjustMomentum(100);
+    expect(store.getState().momentumTier).toBe(2);
+
+    // Drop far below the tier-2 gate
+    store.adjustMomentum(-100 + TIER.momentumGate[2] - TIER.dropHysteresis - 5);
+    expect(store.getState().momentumTier).toBe(2);
+
+    // Not yet: dwell is under the requirement
+    store.decayMomentum(TIER.dropDwellSec / 2);
+    expect(store.getState().momentumTier).toBe(2);
+
+    store.decayMomentum(TIER.dropDwellSec / 2 + 0.05);
+    expect(store.getState().momentumTier).toBeLessThan(2);
+  });
+
+  it('charges the stumble cost for its cause', () => {
+    const before = store.getState().momentum;
+    store.applyStumblePenalty('crate');
+    expect(store.getState().momentum).toBe(before - MOMENTUM.stumbleCost.crate);
   });
 
   it('ignores tips, decay, and distance while paused', () => {
@@ -99,22 +137,40 @@ describe('GameStore', () => {
 
   it('cannot pause after game over', () => {
     store.adjustMomentum(-100);
-    for (let i = 0; i < 11; i++) store.decayMomentum(1);
+    for (let i = 0; i <= MOMENTUM.deathGraceSec; i++) store.decayMomentum(1);
     expect(store.getState().game_over).toBe(true);
     store.setPaused(true);
     expect(store.isPaused()).toBe(false);
   });
 
-  it('applies the tips buff multiplier and expires it', () => {
+  it('doubles gear value under the tips buff and expires it', () => {
     const onDeactivate = vi.fn();
     eventBus.on('BUFF_DEACTIVATED', onDeactivate);
-    store.activateBuff('tips', 2);
+    const before = store.getState().momentum;
+    store.activateBuff('tips');
     store.addTips(1);
-    expect(store.getState().tips).toBe(2);
-    store.updateBuffTimer(1.5);
+    expect(store.getState().momentum).toBe(before + MOMENTUM.gearValue * MOMENTUM.tipsBuffMultiplier);
+    store.updateBuffTimer(BUFFS.tips.duration - 0.5);
     expect(store.getState().activeBuff).toBe('tips');
     store.updateBuffTimer(0.6);
     expect(store.getState().activeBuff).toBeNull();
     expect(onDeactivate).toHaveBeenCalledWith({ buff: 'tips' });
+  });
+
+  it('stacks shield charges and spends them one at a time', () => {
+    expect(store.consumeShield()).toBe(false);
+    store.activateBuff('shield');
+    store.activateBuff('shield');
+    expect(store.getState().shieldCharges).toBe(2);
+    expect(store.consumeShield()).toBe(true);
+    expect(store.consumeShield()).toBe(true);
+    expect(store.consumeShield()).toBe(false);
+  });
+
+  it('keeps a shield while a timed buff is active', () => {
+    store.activateBuff('shield');
+    store.activateBuff('steam');
+    expect(store.getState().shieldCharges).toBe(1);
+    expect(store.getState().activeBuff).toBe('steam');
   });
 });
