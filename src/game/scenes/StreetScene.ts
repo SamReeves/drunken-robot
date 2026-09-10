@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Robot, type RobotContext, type RobotInputs } from '../entities/Robot.ts';
 import { store } from '../../state/store.ts';
 import { eventBus, type BuffType } from '../../state/eventBus.ts';
+import { ensureActTextures, releaseActTextures } from '../art/textureFactory.ts';
 
 interface ParallaxLayer {
   name: 'sky' | 'distant' | 'midground' | 'street' | 'foreground';
@@ -107,6 +108,9 @@ export class StreetScene extends Phaser.Scene {
     });
 
     const initialAct = store.getState().activeAct || 1;
+    // A restart can land on an act whose midground was released; rebuild what this run needs.
+    ensureActTextures(this, initialAct);
+    ensureActTextures(this, initialAct + 1);
     const midLayer = this.add
       .tileSprite(0, 0, width, height, `bg_midground_act${initialAct}`)
       .setOrigin(0, 0)
@@ -351,6 +355,11 @@ export class StreetScene extends Phaser.Scene {
   private handleActTransition(act: number, name: string): void {
     const actDef = store.getActDefinition(act);
     if (!actDef) return;
+
+    // Keep only the current and next midgrounds resident (each is a 2560x720 texture).
+    ensureActTextures(this, act);
+    ensureActTextures(this, act + 1);
+    this.time.delayedCall(3000, () => releaseActTextures(this, act - 1));
 
     // Hot-swap midground architecture texture key to match the new Act
     const midLayer = this.layers.find((l) => l.name === 'midground');
