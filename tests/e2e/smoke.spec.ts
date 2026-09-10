@@ -21,7 +21,7 @@ declare global {
 /** Console errors that are expected in a headless run without a user gesture before load. */
 const ALLOWED = [/AudioContext/i, /GPU stall/i];
 
-async function collectErrors(page: Page): Promise<string[]> {
+function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (m) => {
     if (m.type() === 'error' && !ALLOWED.some((re) => re.test(m.text()))) errors.push(m.text());
@@ -46,7 +46,7 @@ async function startRun(page: Page): Promise<void> {
 }
 
 test('boots, starts a run, plays music, and pauses without console errors', async ({ page }) => {
-  const errors = await collectErrors(page);
+  const errors = collectErrors(page);
   await startRun(page);
 
   // Play for a few seconds with some input
@@ -81,7 +81,7 @@ test('boots, starts a run, plays music, and pauses without console errors', asyn
 });
 
 test('restart from the pause menu returns to act 1 on the same seed', async ({ page }) => {
-  const errors = await collectErrors(page);
+  const errors = collectErrors(page);
   await startRun(page);
   await page.waitForTimeout(1500);
   await page.keyboard.press('KeyP');
@@ -98,7 +98,7 @@ test('restart from the pause menu returns to act 1 on the same seed', async ({ p
 });
 
 test('the debug dashboard mounts cleanly', async ({ page }) => {
-  const errors = await collectErrors(page);
+  const errors = collectErrors(page);
   await page.goto('/?debug=1&test=1');
   await page.waitForSelector('#debug-dashboard');
   await expect(page.locator('#debug-dashboard .channel-strip')).toHaveCount(6);
@@ -124,7 +124,7 @@ test('touch devices get the rotate prompt in portrait and touch guides in landsc
     isMobile: true,
   });
   const p2 = await landscape.newPage();
-  const errors = await collectErrors(p2);
+  const errors = collectErrors(p2);
   await p2.goto('/?seed=2&test=1');
   await expect(p2.locator('#rotate-overlay')).toBeHidden();
   await p2.waitForSelector('canvas');
