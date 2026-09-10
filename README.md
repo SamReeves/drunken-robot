@@ -40,7 +40,7 @@ Survive the 10-minute journey to traverse all five musical biomes:
 
 Live at **https://drunkenrobot.whalegames.net**. Every push to `main` is built by GitHub Actions and published to the `deploy` branch, which DigitalOcean App Platform serves as a static site.
 
-This repository (`SamReeves/drunken-robot`) is the maintained home of the game. It began as a fork of `AMBloom/drunken-robot`; contributions from anyone, including the original author, are welcome as pull requests here.
+This repository (`SamReeves/drunken-robot`) is a fork of `AMBloom/drunken-robot` where the current round of improvements is being developed and hosted. The work will be offered back upstream as a pull request once it is complete.
 
 ## 🛠️ Local Development Setup
 
