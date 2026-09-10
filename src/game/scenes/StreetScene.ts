@@ -95,18 +95,50 @@ export class StreetScene extends Phaser.Scene {
     const skyLayer = this.add.tileSprite(0, 0, width, height, 'bg_sky').setOrigin(0, 0).setScrollFactor(0);
     this.layers.push({ name: 'sky', tileSprite: skyLayer, scrollSpeedFactor: 0.1, currentTint: 0xffffff });
 
-    const distantLayer = this.add.tileSprite(0, 0, width, height, 'bg_distant').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'distant', tileSprite: distantLayer, scrollSpeedFactor: 0.25, currentTint: 0xffffff });
+    const distantLayer = this.add
+      .tileSprite(0, 0, width, height, 'bg_distant')
+      .setOrigin(0, 0)
+      .setScrollFactor(0);
+    this.layers.push({
+      name: 'distant',
+      tileSprite: distantLayer,
+      scrollSpeedFactor: 0.25,
+      currentTint: 0xffffff,
+    });
 
     const initialAct = store.getState().activeAct || 1;
-    const midLayer = this.add.tileSprite(0, 0, width, height, `bg_midground_act${initialAct}`).setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'midground', tileSprite: midLayer, scrollSpeedFactor: 0.55, currentTint: 0xffffff });
+    const midLayer = this.add
+      .tileSprite(0, 0, width, height, `bg_midground_act${initialAct}`)
+      .setOrigin(0, 0)
+      .setScrollFactor(0);
+    this.layers.push({
+      name: 'midground',
+      tileSprite: midLayer,
+      scrollSpeedFactor: 0.55,
+      currentTint: 0xffffff,
+    });
 
-    const streetLayer = this.add.tileSprite(0, 0, width, height, 'bg_street').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'street', tileSprite: streetLayer, scrollSpeedFactor: 1.0, currentTint: 0xffffff });
+    const streetLayer = this.add
+      .tileSprite(0, 0, width, height, 'bg_street')
+      .setOrigin(0, 0)
+      .setScrollFactor(0);
+    this.layers.push({
+      name: 'street',
+      tileSprite: streetLayer,
+      scrollSpeedFactor: 1.0,
+      currentTint: 0xffffff,
+    });
 
-    const fgLayer = this.add.tileSprite(0, 0, width, height, 'bg_foreground').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'foreground', tileSprite: fgLayer, scrollSpeedFactor: 1.25, currentTint: 0xffffff });
+    const fgLayer = this.add
+      .tileSprite(0, 0, width, height, 'bg_foreground')
+      .setOrigin(0, 0)
+      .setScrollFactor(0);
+    this.layers.push({
+      name: 'foreground',
+      tileSprite: fgLayer,
+      scrollSpeedFactor: 1.25,
+      currentTint: 0xffffff,
+    });
 
     // 2. Create Static Cobblestone Ground Platform (Aligned to curb/street baseline at y = 584)
     this.groundPlatform = this.add.rectangle(0, 584, 500000, 60, 0x000000, 0);
@@ -134,9 +166,15 @@ export class StreetScene extends Phaser.Scene {
     this.physics.add.collider(this.robot, this.groundPlatform);
 
     // 5. Overlap Handlers (Collecting Tips, Hitting Hazards & Power-Ups)
-    this.physics.add.overlap(this.robot, this.tipsGroup, (_robot, obj) => this.handleCollectTip(obj as Phaser.Physics.Arcade.Sprite));
-    this.physics.add.overlap(this.robot, this.hazardsGroup, (_robot, obj) => this.handleHitHazard(obj as Phaser.Physics.Arcade.Sprite));
-    this.physics.add.overlap(this.robot, this.powerupsGroup, (_robot, obj) => this.handleCollectPowerup(obj as Phaser.Physics.Arcade.Sprite));
+    this.physics.add.overlap(this.robot, this.tipsGroup, (_robot, obj) =>
+      this.handleCollectTip(obj as Phaser.Physics.Arcade.Sprite),
+    );
+    this.physics.add.overlap(this.robot, this.hazardsGroup, (_robot, obj) =>
+      this.handleHitHazard(obj as Phaser.Physics.Arcade.Sprite),
+    );
+    this.physics.add.overlap(this.robot, this.powerupsGroup, (_robot, obj) =>
+      this.handleCollectPowerup(obj as Phaser.Physics.Arcade.Sprite),
+    );
 
     // 6. Smooth Camera Tracking & Vertical Axis Lock
     this.cameras.main.startFollow(this.robot, true, 0.08, 0.08, -140, 50);
@@ -165,8 +203,8 @@ export class StreetScene extends Phaser.Scene {
       this.handlePauseChange(payload.isPaused);
     });
 
-    this.events.once('shutdown', this.cleanupListeners, this);
-    this.events.once('destroy', this.cleanupListeners, this);
+    this.events.once('shutdown', () => this.cleanupListeners());
+    this.events.once('destroy', () => this.cleanupListeners());
 
     // Apply initial act visual state
     const currentActDef = store.getCurrentActDefinition();
@@ -198,63 +236,75 @@ export class StreetScene extends Phaser.Scene {
     this.drawBadgeBg(0xf59e0b);
 
     const initialAct = store.getCurrentActDefinition();
-    this.actBadgeText = this.add.text(32, 28, `ACT ${initialAct.act}: ${initialAct.name.toUpperCase()}`, {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '13px',
-      color: '#f59e0b',
-      fontStyle: 'bold',
-    }).setScrollFactor(0);
+    this.actBadgeText = this.add
+      .text(32, 28, `ACT ${initialAct.act}: ${initialAct.name.toUpperCase()}`, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+        color: '#f59e0b',
+        fontStyle: 'bold',
+      })
+      .setScrollFactor(0);
 
     // Live Tips & Momentum HUD labels
-    this.tipsText = this.add.text(32, 48, '⚙️ Tips: 0', {
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      color: '#fbbf24',
-      fontStyle: 'bold',
-    }).setScrollFactor(0);
+    this.tipsText = this.add
+      .text(32, 48, '⚙️ Tips: 0', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#fbbf24',
+        fontStyle: 'bold',
+      })
+      .setScrollFactor(0);
 
-    this.momentumText = this.add.text(140, 48, '⚡ Momentum: 0% [Solo]', {
-      fontFamily: 'monospace',
-      fontSize: '11px',
-      color: '#9ca3af',
-    }).setScrollFactor(0);
+    this.momentumText = this.add
+      .text(140, 48, '⚡ Momentum: 0% [Solo]', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#9ca3af',
+      })
+      .setScrollFactor(0);
 
     // Cinematic Center-Screen Act Transition Banner
-    this.bannerContainer = this.add.container(width / 2, 240).setScrollFactor(0).setAlpha(0).setDepth(100);
+    this.bannerContainer = this.add
+      .container(width / 2, 240)
+      .setScrollFactor(0)
+      .setAlpha(0)
+      .setDepth(100);
     this.bannerBg = this.add.graphics();
     this.bannerBg.fillStyle(0x090a0f, 0.92);
     this.bannerBg.lineStyle(2, 0xf59e0b, 0.95);
     this.bannerBg.fillRoundedRect(-240, -45, 480, 90, 10);
     this.bannerBg.strokeRoundedRect(-240, -45, 480, 90, 10);
 
-    this.bannerTitleText = this.add.text(0, -18, '', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '19px',
-      color: '#fef08a',
-      fontStyle: 'bold',
-    }).setOrigin(0.5, 0.5);
+    this.bannerTitleText = this.add
+      .text(0, -18, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '19px',
+        color: '#fef08a',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0.5);
 
-    this.bannerSubText = this.add.text(0, 14, '', {
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      color: '#9ca3af',
-    }).setOrigin(0.5, 0.5);
+    this.bannerSubText = this.add
+      .text(0, 14, '', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#9ca3af',
+      })
+      .setOrigin(0.5, 0.5);
 
     this.bannerContainer.add([this.bannerBg, this.bannerTitleText, this.bannerSubText]);
 
     // Right Control Guide HUD
-    this.statusText = this.add.text(
-      width - 20,
-      20,
-      'A / D (← / →) : Balance Torque | Hold Space : Accordion Jump',
-      {
+    this.statusText = this.add
+      .text(width - 20, 20, 'A / D (← / →) : Balance Torque | Hold Space : Accordion Jump', {
         fontFamily: 'monospace',
         fontSize: '11px',
         color: '#d1d5db',
         backgroundColor: 'rgba(18, 19, 22, 0.88)',
         padding: { x: 12, y: 7 },
-      }
-    ).setOrigin(1, 0).setScrollFactor(0);
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0);
 
     // Dynamic Gauges Container (Pinned top right below guide)
     this.hudBellowsBar = this.add.graphics().setScrollFactor(0);
@@ -263,12 +313,14 @@ export class StreetScene extends Phaser.Scene {
 
     // Active Buff Indicator HUD Badge
     this.activeBuffBadgeBg = this.add.graphics().setScrollFactor(0);
-    this.activeBuffBadgeText = this.add.text(32, 100, '', {
-      fontFamily: 'monospace',
-      fontSize: '11px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    }).setScrollFactor(0);
+    this.activeBuffBadgeText = this.add
+      .text(32, 100, '', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setScrollFactor(0);
   }
 
   private drawBadgeBg(strokeColor: number): void {
@@ -358,13 +410,9 @@ export class StreetScene extends Phaser.Scene {
             fromColor,
             toColor,
             100,
-            Math.round(colorTweenObj.progress * 100)
+            Math.round(colorTweenObj.progress * 100),
           );
-          const currentHex = Phaser.Display.Color.GetColor(
-            interpolated.r,
-            interpolated.g,
-            interpolated.b
-          );
+          const currentHex = Phaser.Display.Color.GetColor(interpolated.r, interpolated.g, interpolated.b);
           layer.tileSprite.setTint(currentHex);
           layer.currentTint = currentHex;
         },
@@ -472,12 +520,14 @@ export class StreetScene extends Phaser.Scene {
     store.addTips(1);
 
     // Visual floating "+1 ⚙️" feedback
-    const floatText = this.add.text(tx, ty - 10, '+1 ⚙️', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '13px',
-      color: '#fbbf24',
-      fontStyle: 'bold',
-    }).setOrigin(0.5, 0.5);
+    const floatText = this.add
+      .text(tx, ty - 10, '+1 ⚙️', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+        color: '#fbbf24',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0.5);
 
     this.tweens.add({
       targets: floatText,
@@ -520,14 +570,16 @@ export class StreetScene extends Phaser.Scene {
     }
 
     // Floating text indicator
-    const floatText = this.add.text(px, py - 15, indicator, {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '15px',
-      color: textColor,
-      fontStyle: 'bold',
-      stroke: '#18181b',
-      strokeThickness: 3,
-    }).setOrigin(0.5, 0.5);
+    const floatText = this.add
+      .text(px, py - 15, indicator, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '15px',
+        color: textColor,
+        fontStyle: 'bold',
+        stroke: '#18181b',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0.5);
 
     this.tweens.add({
       targets: floatText,
@@ -563,14 +615,16 @@ export class StreetScene extends Phaser.Scene {
       });
 
       // Floating "SMASHED! ⚡" feedback indicator
-      const smashText = this.add.text(hx, hy - 25, 'SMASHED! ⚡', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
-        color: '#38bdf8',
-        fontStyle: 'bold',
-        stroke: '#082f49',
-        strokeThickness: 3,
-      }).setOrigin(0.5, 0.5);
+      const smashText = this.add
+        .text(hx, hy - 25, 'SMASHED! ⚡', {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '14px',
+          color: '#38bdf8',
+          fontStyle: 'bold',
+          stroke: '#082f49',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5, 0.5);
 
       this.tweens.add({
         targets: smashText,
@@ -604,12 +658,14 @@ export class StreetScene extends Phaser.Scene {
     });
 
     // Floating Stumble text indicator
-    const stumbleText = this.add.text(hx, hy - 25, 'STUMBLE! ⚠️', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '13px',
-      color: '#ef4444',
-      fontStyle: 'bold',
-    }).setOrigin(0.5, 0.5);
+    const stumbleText = this.add
+      .text(hx, hy - 25, 'STUMBLE! ⚠️', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+        color: '#ef4444',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0.5);
 
     this.tweens.add({
       targets: stumbleText,
@@ -646,7 +702,9 @@ export class StreetScene extends Phaser.Scene {
 
     // 1. Update Progression Info
     this.tipsText.setText(`⚙️ Tips: ${gameState.tips}`);
-    this.momentumText.setText(`⚡ ${Math.round(gameState.momentum)}% [T${gameState.momentumTier}: ${gameState.tierName}]`);
+    this.momentumText.setText(
+      `⚡ ${Math.round(gameState.momentum)}% [T${gameState.momentumTier}: ${gameState.tierName}]`,
+    );
 
     // Top-left momentum progress bar
     this.hudProgressionGfx.clear();
@@ -659,8 +717,9 @@ export class StreetScene extends Phaser.Scene {
     this.hudProgressionGfx.fillRoundedRect(progX, progY, progW, progH, 2);
 
     if (gameState.momentum > 0) {
-      const fillW = Math.max(4, (progW) * (gameState.momentum / 100));
-      const tierColor = gameState.momentumTier >= 3 ? 0xa855f7 : gameState.momentumTier >= 1 ? 0xf59e0b : 0x10b981;
+      const fillW = Math.max(4, progW * (gameState.momentum / 100));
+      const tierColor =
+        gameState.momentumTier >= 3 ? 0xa855f7 : gameState.momentumTier >= 1 ? 0xf59e0b : 0x10b981;
       this.hudProgressionGfx.fillStyle(tierColor, 0.95);
       this.hudProgressionGfx.fillRoundedRect(progX, progY, fillW, progH, 2);
     }
@@ -755,10 +814,16 @@ export class StreetScene extends Phaser.Scene {
       const progressRatio = Phaser.Math.Clamp(
         gameState.buffTimeRemaining / (gameState.buffDuration || StreetScene.BUFF_DURATION_SEC),
         0,
-        1
+        1,
       );
       this.activeBuffBadgeBg.fillStyle(badgeStroke, 0.7);
-      this.activeBuffBadgeBg.fillRoundedRect(badgeX + 4, badgeY + badgeH - 4, (badgeW - 8) * progressRatio, 2, 1);
+      this.activeBuffBadgeBg.fillRoundedRect(
+        badgeX + 4,
+        badgeY + badgeH - 4,
+        (badgeW - 8) * progressRatio,
+        2,
+        1,
+      );
 
       this.activeBuffBadgeText.setText(buffTitle);
       this.activeBuffBadgeText.setColor(textColor);
@@ -780,7 +845,7 @@ export class StreetScene extends Phaser.Scene {
 
     this.powerupCooldownMs = Phaser.Math.Between(
       StreetScene.POWERUP_MIN_INTERVAL_MS,
-      StreetScene.POWERUP_MAX_INTERVAL_MS
+      StreetScene.POWERUP_MAX_INTERVAL_MS,
     );
 
     const cameraRightEdge = this.cameras.main.scrollX + this.scale.width + 60;
@@ -793,7 +858,11 @@ export class StreetScene extends Phaser.Scene {
     if (selectedBuff === 'balance') textureKey = 'powerup_brandy';
     else if (selectedBuff === 'jump') textureKey = 'powerup_steam';
 
-    const powerup = this.powerupsGroup.create(cameraRightEdge, baseY, textureKey) as Phaser.Physics.Arcade.Sprite;
+    const powerup = this.powerupsGroup.create(
+      cameraRightEdge,
+      baseY,
+      textureKey,
+    ) as Phaser.Physics.Arcade.Sprite;
     powerup.setOrigin(0.5, 0.5);
     (powerup.body as Phaser.Physics.Arcade.Body)?.setSize(28, 28);
     powerup.setData('buffType', selectedBuff);
@@ -829,7 +898,9 @@ export class StreetScene extends Phaser.Scene {
     // 2. Gather Inputs
     const leftDown = Boolean(this.cursors?.left.isDown || this.keyA?.isDown);
     const rightDown = Boolean(this.cursors?.right.isDown || this.keyD?.isDown);
-    const jumpDown = Boolean(this.cursors?.space?.isDown || this.keySpace?.isDown || this.keyW?.isDown || this.cursors?.up.isDown);
+    const jumpDown = Boolean(
+      this.cursors?.space?.isDown || this.keySpace?.isDown || this.keyW?.isDown || this.cursors?.up.isDown,
+    );
 
     const inputs: RobotInputs = {
       left: leftDown,
@@ -908,7 +979,10 @@ export class StreetScene extends Phaser.Scene {
 
   private showGameOverOverlay(distanceTraveled: number, tips: number): void {
     const { width, height } = this.scale;
-    const overlay = this.add.container(width / 2, height / 2).setScrollFactor(0).setDepth(200);
+    const overlay = this.add
+      .container(width / 2, height / 2)
+      .setScrollFactor(0)
+      .setDepth(200);
 
     // Dark backdrop
     const backdrop = this.add.graphics();
@@ -932,13 +1006,18 @@ export class StreetScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const desc = this.add
-      .text(0, -75, 'The drunken automaton ran out of rhythmic momentum\nand collapsed on the rain-slick cobblestones.', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        color: '#cbd5e1',
-        align: 'center',
-        lineSpacing: 4,
-      })
+      .text(
+        0,
+        -75,
+        'The drunken automaton ran out of rhythmic momentum\nand collapsed on the rain-slick cobblestones.',
+        {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '13px',
+          color: '#cbd5e1',
+          align: 'center',
+          lineSpacing: 4,
+        },
+      )
       .setOrigin(0.5);
 
     const stats = this.add
@@ -984,10 +1063,7 @@ export class StreetScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    const hitZone = this.add
-      .zone(0, 75, 260, 44)
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    const hitZone = this.add.zone(0, 75, 260, 44).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
     const restartAction = (): void => this.restartRun();
 
@@ -1048,7 +1124,10 @@ export class StreetScene extends Phaser.Scene {
     if (this.pauseOverlay) return;
 
     const { width, height } = this.scale;
-    const overlay = this.add.container(width / 2, height / 2).setScrollFactor(0).setDepth(250);
+    const overlay = this.add
+      .container(width / 2, height / 2)
+      .setScrollFactor(0)
+      .setDepth(250);
 
     // Darkened backdrop
     const backdrop = this.add.graphics();
@@ -1073,13 +1152,18 @@ export class StreetScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const desc = this.add
-      .text(0, -74, 'The automaton rests its weary brass gears.\nRhythm and journey are temporarily suspended.', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        color: '#cbd5e1',
-        align: 'center',
-        lineSpacing: 4,
-      })
+      .text(
+        0,
+        -74,
+        'The automaton rests its weary brass gears.\nRhythm and journey are temporarily suspended.',
+        {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '13px',
+          color: '#cbd5e1',
+          align: 'center',
+          lineSpacing: 4,
+        },
+      )
       .setOrigin(0.5);
 
     const state = store.getState();
@@ -1092,7 +1176,7 @@ export class StreetScene extends Phaser.Scene {
           fontFamily: 'monospace',
           fontSize: '12px',
           color: '#fbbf24',
-        }
+        },
       )
       .setOrigin(0.5);
 
@@ -1120,10 +1204,7 @@ export class StreetScene extends Phaser.Scene {
 
     btnResumeContainer.add([resumeGlow, resumeBg, resumeText]);
 
-    const resumeHit = this.add
-      .zone(0, 32, 240, 36)
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    const resumeHit = this.add.zone(0, 32, 240, 36).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
     resumeHit.on('pointerdown', () => {
       store.setPaused(false);
@@ -1149,10 +1230,7 @@ export class StreetScene extends Phaser.Scene {
 
     btnRestartContainer.add([restartBg, restartText]);
 
-    const restartHit = this.add
-      .zone(0, 84, 240, 36)
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    const restartHit = this.add.zone(0, 84, 240, 36).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
     const restartAction = (): void => this.restartRun();
 
@@ -1228,4 +1306,3 @@ export class StreetScene extends Phaser.Scene {
     }
   }
 }
-

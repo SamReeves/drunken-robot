@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { audioEngine } from '../../audio/engine.ts';
 import { eventBus } from '../../state/eventBus.ts';
+import { store } from '../../state/store.ts';
 
 /**
  * TitleScene - Entry Title & Audio Context Unlock Screen
@@ -51,7 +52,13 @@ export class TitleScene extends Phaser.Scene {
     for (let i = 0; i < 18; i++) {
       const px = Phaser.Math.Between(40, width - 40);
       const py = Phaser.Math.Between(100, height - 120);
-      const dot = this.add.circle(px, py, Phaser.Math.FloatBetween(1.2, 2.5), 0xfef08a, Phaser.Math.FloatBetween(0.2, 0.6));
+      const dot = this.add.circle(
+        px,
+        py,
+        Phaser.Math.FloatBetween(1.2, 2.5),
+        0xfef08a,
+        Phaser.Math.FloatBetween(0.2, 0.6),
+      );
       this.tweens.add({
         targets: dot,
         y: py - Phaser.Math.Between(20, 60),
@@ -236,7 +243,9 @@ export class TitleScene extends Phaser.Scene {
         console.warn('[TitleScene] Audio context init warning:', err);
       }
 
-      // Signal conductor & state store
+      // Fresh run state. reset() announces Act 1 so the conductor picks up the
+      // act's scale/meter/bpm instead of playing its constructor defaults.
+      store.reset();
       eventBus.emit('GAME_START', {});
 
       // Fade camera smoothly to StreetScene

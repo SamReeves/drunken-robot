@@ -120,28 +120,32 @@ audioEngine.subscribe((state: AudioEngineState) => {
   }
 });
 
-btnUnlock.addEventListener('click', async () => {
-  try {
-    await audioEngine.init();
-    initGame('game-container');
-    refreshGameScale();
-  } catch (err) {
-    console.error('Failed to unlock audio context:', err);
-  }
+btnUnlock.addEventListener('click', () => {
+  void audioEngine
+    .init()
+    .then(() => {
+      initGame('game-container');
+      refreshGameScale();
+    })
+    .catch((err: unknown) => {
+      console.error('Failed to unlock audio context:', err);
+    });
 });
 
 // -------------------------------------------------------------
 // 5. Transport Controls
 // -------------------------------------------------------------
-btnPlay.addEventListener('click', async () => {
-  try {
-    store.setPaused(false);
-    await conductor.start();
-    btnPlay.classList.add('active');
-    btnPause.classList.remove('active');
-  } catch (err) {
-    console.error('Failed to start conductor:', err);
-  }
+btnPlay.addEventListener('click', () => {
+  void (async () => {
+    try {
+      store.setPaused(false);
+      await conductor.start();
+      btnPlay.classList.add('active');
+      btnPause.classList.remove('active');
+    } catch (err) {
+      console.error('Failed to start conductor:', err);
+    }
+  })();
 });
 
 btnPause.addEventListener('click', () => {
@@ -180,7 +184,7 @@ function updateMeterLeds(meter: MeterType): void {
     node.className = 'led-node';
     node.id = `led-step-${i}`;
 
-    let isAccent = false;
+    let isAccent: boolean;
     if (meter === '4/4') {
       isAccent = i === 0 || i === 4;
     } else if (is322) {
@@ -248,7 +252,7 @@ function renderVirtualKeyboard(scaleName: ScaleName): void {
     const triggerNoteOn = (e: Event) => {
       e.preventDefault();
       keyBtn.classList.add('pressed');
-      audioEngine.init().then(() => {
+      void audioEngine.init().then(() => {
         accordion.triggerAttack(note, undefined, 0.85);
       });
     };
@@ -396,7 +400,8 @@ function renderMixerRack(channels: InstrumentChannelState[]): void {
     panGroup.className = 'pan-group';
     const panHeader = document.createElement('div');
     panHeader.className = 'fader-label-row';
-    const formatPan = (p: number) => (p === 0 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`);
+    const formatPan = (p: number) =>
+      p === 0 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`;
     panHeader.innerHTML = `<span>Pan</span><span class="fader-val" id="pan-val-${ch.id}">${formatPan(ch.pan)}</span>`;
     const panInput = document.createElement('input');
     panInput.type = 'range';
@@ -421,9 +426,11 @@ function renderMixerRack(channels: InstrumentChannelState[]): void {
     btnAudition.type = 'button';
     btnAudition.className = 'btn-audition';
     btnAudition.textContent = '▶ Audition';
-    btnAudition.addEventListener('click', async () => {
-      await audioEngine.init();
-      auditionInstrument(ch.id);
+    btnAudition.addEventListener('click', () => {
+      void (async () => {
+        await audioEngine.init();
+        auditionInstrument(ch.id);
+      })();
     });
 
     strip.appendChild(header);
@@ -556,7 +563,14 @@ renderVirtualKeyboard('D_PHRYGIAN_DOMINANT');
 // -------------------------------------------------------------
 // Bridge State Store to EnsembleMixer (Auto-recruitment / unmuting of companions by momentum tier)
 store.subscribe((state) => {
-  const allInstrumentIds: InstrumentId[] = ['accordion', 'bass', 'percussion', 'guitar', 'violin', 'clarinet'];
+  const allInstrumentIds: InstrumentId[] = [
+    'accordion',
+    'bass',
+    'percussion',
+    'guitar',
+    'violin',
+    'clarinet',
+  ];
   allInstrumentIds.forEach((id) => {
     const shouldBeActive = state.activeInstruments.includes(id);
     const current = mixer.getChannelState(id);
@@ -590,7 +604,7 @@ eventBus.on('BELLOWS_BURST', (e) => {
   }
 });
 
-eventBus.on('TIP_COLLECTED', (_e) => {
+eventBus.on('TIP_COLLECTED', () => {
   if (audioEngine.isReady) {
     // Subtle castanet sparkle / rhythmic chime on pickup
     percussion.triggerCastanet(undefined, 0.75);
@@ -620,7 +634,7 @@ eventBus.on('BUFF_ACTIVATED', (e) => {
   }
 });
 
-eventBus.on('PLAYER_STUMBLE', (_e) => {
+eventBus.on('PLAYER_STUMBLE', () => {
   if (audioEngine.isReady) {
     percussion.triggerStomp(undefined, 0.95);
     percussion.triggerCastanet(undefined, 0.9);
@@ -706,17 +720,19 @@ eventBus.on('ACT_CHANGE', (payload) => {
 // -------------------------------------------------------------
 // 15. Game Flow Audio Orchestration (Start, Failure, Victory, Restart)
 // -------------------------------------------------------------
-eventBus.on('GAME_START', async () => {
-  try {
-    if (!audioEngine.isReady) {
-      await audioEngine.init();
+eventBus.on('GAME_START', () => {
+  void (async () => {
+    try {
+      if (!audioEngine.isReady) {
+        await audioEngine.init();
+      }
+      await conductor.start();
+      btnPlay.classList.add('active');
+      btnPause.classList.remove('active');
+    } catch (err) {
+      console.warn('[main] Error starting conductor on GAME_START:', err);
     }
-    await conductor.start();
-    btnPlay.classList.add('active');
-    btnPause.classList.remove('active');
-  } catch (err) {
-    console.warn('[main] Error starting conductor on GAME_START:', err);
-  }
+  })();
 });
 
 eventBus.on('GAME_OVER', () => {
@@ -748,37 +764,39 @@ eventBus.on('VICTORY', () => {
   btnPause.classList.add('active');
 });
 
-eventBus.on('RESTART_GAME', async () => {
-  try {
-    // Rewind the musical clock so the new run starts on bar 1, beat 1.
-    // Act-1 scale/meter/bpm arrive via the ACT_CHANGE that store.reset() emits.
-    conductor.stop();
-    await conductor.start();
-    btnPlay.classList.add('active');
-    btnPause.classList.remove('active');
-  } catch (err) {
-    console.warn('[main] Error restarting conductor on RESTART_GAME:', err);
-  }
+eventBus.on('RESTART_GAME', () => {
+  void (async () => {
+    try {
+      // Rewind the musical clock so the new run starts on bar 1, beat 1.
+      // Act-1 scale/meter/bpm arrive via the ACT_CHANGE that store.reset() emits.
+      conductor.stop();
+      await conductor.start();
+      btnPlay.classList.add('active');
+      btnPause.classList.remove('active');
+    } catch (err) {
+      console.warn('[main] Error restarting conductor on RESTART_GAME:', err);
+    }
+  })();
 });
 
 eventBus.on('UI_SET_SIDEBAR', (payload) => {
   setSidebarCollapsed(payload.collapsed);
 });
 
-eventBus.on('GAME_PAUSE', async (payload) => {
-  if (payload.isPaused) {
-    conductor.pause();
-    btnPlay.classList.remove('active');
-    btnPause.classList.add('active');
-  } else {
-    try {
-      await conductor.start();
-      btnPlay.classList.add('active');
-      btnPause.classList.remove('active');
-    } catch (err) {
-      console.warn('[main] Error resuming conductor on GAME_PAUSE:', err);
+eventBus.on('GAME_PAUSE', (payload) => {
+  void (async () => {
+    if (payload.isPaused) {
+      conductor.pause();
+      btnPlay.classList.remove('active');
+      btnPause.classList.add('active');
+    } else {
+      try {
+        await conductor.start();
+        btnPlay.classList.add('active');
+        btnPause.classList.remove('active');
+      } catch (err) {
+        console.warn('[main] Error resuming conductor on GAME_PAUSE:', err);
+      }
     }
-  }
+  })();
 });
-
-

@@ -145,7 +145,7 @@ export class EventBus {
       handlers = new Set();
       this.listeners.set(event, handlers);
     }
-    handlers.add(handler as AnyHandler);
+    handlers.add(handler);
     return () => {
       this.off(event, handler);
     };
@@ -164,7 +164,7 @@ export class EventBus {
   public off<T extends GameEventType>(event: T, handler: GameEventHandler<T>): void {
     const handlers = this.listeners.get(event);
     if (!handlers) return;
-    handlers.delete(handler as AnyHandler);
+    handlers.delete(handler);
     if (handlers.size === 0) {
       this.listeners.delete(event);
     }
