@@ -1,9 +1,6 @@
 /**
- * EventBus - Decoupled Type-Safe Event Emitter
- * The Drunken Robot's Journey Home
- *
- * Provides decoupled pub/sub communication between Phaser 4 (Game Engine)
- * and Tone.js (Generative Gypsy Folk Engine).
+ * EventBus - typed pub/sub between the Phaser game layer and the Tone.js audio layer.
+ * Neither side imports the other; they only share this bus and the store.
  */
 
 import type { InstrumentId } from '../audio/types.ts';
@@ -53,7 +50,10 @@ export interface GameEventMap {
     stride: number;
   };
 
-  /** Fired when movement velocity changes */
+  /**
+   * Movement telemetry. Not emitted per frame today; reserved for a throttled
+   * emitter once the music director consumes it.
+   */
   VELOCITY_CHANGE: {
     vx: number;
     vy: number;
@@ -61,7 +61,7 @@ export interface GameEventMap {
     isGrounded: boolean;
   };
 
-  /** Fired as the robot tilts and sways */
+  /** Lean telemetry. Same status as VELOCITY_CHANGE. */
   LEAN_CHANGE: {
     angle: number; // in degrees
     balance: number; // -1.0 (far left) to 1.0 (far right)
@@ -69,8 +69,6 @@ export interface GameEventMap {
 
   /** Fired when a glowing copper tip (coin/gear) is collected */
   TIP_COLLECTED: {
-    x: number;
-    y: number;
     totalTips: number;
     momentum: number;
   };
@@ -117,7 +115,7 @@ export interface GameEventMap {
     tips: number;
   };
 
-  /** Fired when the player retries after game over */
+  /** Fired when the player retries after game over, victory, or from the pause menu */
   RESTART_GAME: Record<string, never>;
 
   /** Fired when game pause state toggles */
@@ -134,27 +132,26 @@ export interface GameEventMap {
 export type GameEventType = keyof GameEventMap;
 export type GameEventHandler<T extends GameEventType> = (payload: GameEventMap[T]) => void;
 
+/** Handlers are stored erased; `on`/`emit` are the only typed entry points. */
+type AnyHandler = (payload: never) => void;
+
 export class EventBus {
-  private listeners: { [K in GameEventType]?: Set<GameEventHandler<K>> } = {};
+  private listeners = new Map<GameEventType, Set<AnyHandler>>();
 
-  /**
-   * Subscribe to a game event. Returns an unsubscribe function.
-   */
+  /** Subscribe to a game event. Returns an unsubscribe function. */
   public on<T extends GameEventType>(event: T, handler: GameEventHandler<T>): () => void {
-    if (!this.listeners[event]) {
-      this.listeners[event] = new Set() as any;
+    let handlers = this.listeners.get(event);
+    if (!handlers) {
+      handlers = new Set();
+      this.listeners.set(event, handlers);
     }
-    const handlers = this.listeners[event] as Set<GameEventHandler<T>>;
-    handlers.add(handler);
-
+    handlers.add(handler as AnyHandler);
     return () => {
       this.off(event, handler);
     };
   }
 
-  /**
-   * Subscribe to a game event once.
-   */
+  /** Subscribe to a game event for a single delivery. */
   public once<T extends GameEventType>(event: T, handler: GameEventHandler<T>): () => void {
     const wrapper: GameEventHandler<T> = (payload) => {
       this.off(event, wrapper);
@@ -163,40 +160,38 @@ export class EventBus {
     return this.on(event, wrapper);
   }
 
-  /**
-   * Unsubscribe from a game event.
-   */
+  /** Unsubscribe from a game event. */
   public off<T extends GameEventType>(event: T, handler: GameEventHandler<T>): void {
-    const handlers = this.listeners[event] as Set<GameEventHandler<T>> | undefined;
-    if (handlers) {
-      handlers.delete(handler);
-      if (handlers.size === 0) {
-        delete this.listeners[event];
+    const handlers = this.listeners.get(event);
+    if (!handlers) return;
+    handlers.delete(handler as AnyHandler);
+    if (handlers.size === 0) {
+      this.listeners.delete(event);
+    }
+  }
+
+  /** Emit an event to all subscribers. A throwing handler does not stop the others. */
+  public emit<T extends GameEventType>(event: T, payload: GameEventMap[T]): void {
+    const handlers = this.listeners.get(event);
+    if (!handlers) return;
+    // Copy so handlers that unsubscribe themselves mid-emit do not skip siblings.
+    for (const handler of [...handlers]) {
+      try {
+        (handler as GameEventHandler<T>)(payload);
+      } catch (err) {
+        console.error(`[EventBus] Error in handler for event '${event}':`, err);
       }
     }
   }
 
-  /**
-   * Emit an event with typed payload to all subscribers.
-   */
-  public emit<T extends GameEventType>(event: T, payload: GameEventMap[T]): void {
-    const handlers = this.listeners[event] as Set<GameEventHandler<T>> | undefined;
-    if (handlers) {
-      handlers.forEach((handler) => {
-        try {
-          handler(payload);
-        } catch (err) {
-          console.error(`[EventBus] Error in handler for event '${event}':`, err);
-        }
-      });
-    }
+  /** Number of handlers registered for an event (used by tests). */
+  public listenerCount(event: GameEventType): number {
+    return this.listeners.get(event)?.size ?? 0;
   }
 
-  /**
-   * Remove all registered listeners.
-   */
+  /** Remove all registered listeners. */
   public clear(): void {
-    this.listeners = {};
+    this.listeners.clear();
   }
 }
 

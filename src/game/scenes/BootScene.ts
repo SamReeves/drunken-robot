@@ -97,7 +97,6 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     // Optional preloading of static assets if present
-    this.load.image('hero', '/src/assets/hero.png');
 
     // Generate high-resolution procedural placeholder textures for parallax layers and hazards
     this.createProceduralTextures();
@@ -746,7 +745,6 @@ export class BootScene extends Phaser.Scene {
     }
 
     midGfx.generateTexture('bg_midground_act1', 2560, 720);
-    midGfx.generateTexture('bg_midground', 2560, 720); // Backwards-compatibility alias
     midGfx.destroy();
   }
 
@@ -1956,7 +1954,6 @@ export class BootScene extends Phaser.Scene {
     crate1Gfx.fillCircle(36, 20, 1.2);
 
     crate1Gfx.generateTexture('hazard_crate_act1', 44, 44);
-    crate1Gfx.generateTexture('hazard_crate', 44, 44); // Legacy alias
     crate1Gfx.destroy();
 
     // ---------------------------------------------------------
@@ -2133,7 +2130,6 @@ export class BootScene extends Phaser.Scene {
     pud1Gfx.strokePath();
 
     pud1Gfx.generateTexture('hazard_puddle_act1', 60, 18);
-    pud1Gfx.generateTexture('hazard_puddle', 60, 18); // Legacy alias
     pud1Gfx.destroy();
 
     // ---------------------------------------------------------

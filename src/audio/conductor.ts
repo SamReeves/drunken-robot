@@ -70,6 +70,8 @@ export class Conductor {
   private repeatEventId: number | null = null;
   private currentStep = 0;
   private measureCount = 0;
+  /** Meter requested mid-bar; applied when the current bar completes. */
+  private pendingMeter: MeterType | null = null;
   private listeners: Set<ConductorListener> = new Set();
   private melodyIndex = 0;
 
@@ -111,9 +113,22 @@ export class Conductor {
     return this.activeScale;
   }
 
+  /**
+   * Changes meter. If a bar is in progress the change waits for the bar
+   * boundary so the switch lands on a downbeat instead of truncating the bar.
+   */
   public setMeter(meter: MeterType): void {
-    this.activeMeter = meter;
-    this.currentStep = 0;
+    if (meter === this.activeMeter) {
+      this.pendingMeter = null;
+      return;
+    }
+    if (!this.isPlaying() || this.currentStep === 0) {
+      this.activeMeter = meter;
+      this.pendingMeter = null;
+      this.currentStep = 0;
+      return;
+    }
+    this.pendingMeter = meter;
   }
 
   public setScale(scale: ScaleName): void {
@@ -160,6 +175,7 @@ export class Conductor {
     this.currentStep = 0;
     this.measureCount = 0;
     this.melodyIndex = 0;
+    this.pendingMeter = null;
     this.accordion.releaseAll();
     this.guitar.releaseAll();
     this.bass.triggerRelease();
@@ -361,11 +377,15 @@ export class Conductor {
         }
       }, time);
 
-      // Advance step counter
+      // Advance step counter; apply any queued meter change on the bar boundary
       this.currentStep++;
       if (this.currentStep >= config.totalSteps) {
         this.currentStep = 0;
         this.measureCount++;
+        if (this.pendingMeter !== null) {
+          this.activeMeter = this.pendingMeter;
+          this.pendingMeter = null;
+        }
       }
     }, '8n');
   }

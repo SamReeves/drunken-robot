@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
-import { eventBus } from '../../state/eventBus.ts';
-import { store } from '../../state/store.ts';
+import { eventBus, type BuffType } from '../../state/eventBus.ts';
 
 export const ACT_SWAY_TORQUES: Record<number, number> = {
   1: 1.0,
@@ -22,6 +21,15 @@ export interface RobotInputs {
   left: boolean;
   right: boolean;
   jump: boolean;
+}
+
+/**
+ * Per-frame snapshot of the game state the robot depends on. The scene builds
+ * one of these each update so the entity never reads the store itself.
+ */
+export interface RobotContext {
+  activeAct: number;
+  activeBuff: BuffType | null;
 }
 
 interface SteamParticle {
@@ -71,6 +79,9 @@ export class Robot extends Phaser.GameObjects.Container {
   // Steam particle system
   private steamParticles: SteamParticle[] = [];
 
+  // Latest context from the scene; defaults keep the entity usable before the first update
+  private ctx: RobotContext = { activeAct: 1, activeBuff: null };
+
   // Graphics Display Components
   private shadowGfx: Phaser.GameObjects.Graphics;
   private limbsGfx: Phaser.GameObjects.Graphics;
@@ -83,9 +94,8 @@ export class Robot extends Phaser.GameObjects.Container {
   public static readonly AUTO_WALK_SPEED = 180;
   private static readonly MAX_WALK_SPEED = 240;
   private static readonly TORQUE_FORCE = 5.6;
-  public static readonly STABILITY_THRESHOLD = 0.45; // Default fallback
-  public static readonly ACT_SWAY_TORQUES = ACT_SWAY_TORQUES;
-  public static readonly ACT_STABILITY_THRESHOLDS = ACT_STABILITY_THRESHOLDS;
+  private static readonly DEFAULT_STABILITY_THRESHOLD = 0.45;
+  private static readonly DEFAULT_SWAY_TORQUE = 2.0;
   private static readonly BASE_JUMP_FORCE = 390;
   private static readonly MAX_JUMP_BOOST = 410;
   private static readonly COYOTE_DURATION = 0.14; // 140ms ground tolerance
@@ -140,15 +150,12 @@ export class Robot extends Phaser.GameObjects.Container {
   }
 
   public getDynamicStabilityThreshold(): number {
-    const state = store.getState();
-    const activeAct = state.activeAct || 1;
-    const base = ACT_STABILITY_THRESHOLDS[activeAct] ?? 0.45;
-    return state.activeBuff === 'balance' ? base * 1.5 : base;
+    const base = ACT_STABILITY_THRESHOLDS[this.ctx.activeAct] ?? Robot.DEFAULT_STABILITY_THRESHOLD;
+    return this.ctx.activeBuff === 'balance' ? base * 1.5 : base;
   }
 
   public getDynamicSwayTorque(): number {
-    const activeAct = store.getState().activeAct || 1;
-    return ACT_SWAY_TORQUES[activeAct] ?? 2.0;
+    return ACT_SWAY_TORQUES[this.ctx.activeAct] ?? Robot.DEFAULT_SWAY_TORQUE;
   }
 
   public getStabilityRatio(): number {
@@ -158,7 +165,8 @@ export class Robot extends Phaser.GameObjects.Container {
   /**
    * Main physics & control update loop
    */
-  public update(_time: number, delta: number, inputs: RobotInputs): void {
+  public update(_time: number, delta: number, inputs: RobotInputs, ctx: RobotContext): void {
+    this.ctx = ctx;
     const dt = Math.min(delta / 1000, 0.1);
     const isPhysicallyGrounded = Boolean(this.body.blocked.down || this.body.touching.down);
 
@@ -192,19 +200,6 @@ export class Robot extends Phaser.GameObjects.Container {
 
     // 5. Redraw Sketchbook Graphics & Apply Transformations
     this.redrawVisuals(dt, isPhysicallyGrounded ? this.body.velocity.x : 0, this.bellowsPressure);
-
-    // 6. Emit Continuous Telemetry
-    eventBus.emit('VELOCITY_CHANGE', {
-      vx: this.body.velocity.x,
-      vy: this.body.velocity.y,
-      speedRatio: this.body.velocity.x / Robot.MAX_WALK_SPEED,
-      isGrounded: isPhysicallyGrounded,
-    });
-
-    eventBus.emit('LEAN_CHANGE', {
-      angle: Phaser.Math.RadToDeg(this.wobbleAngle),
-      balance: Phaser.Math.Clamp(this.wobbleAngle / this.getDynamicStabilityThreshold(), -1, 1),
-    });
   }
 
   private handleBellowsJump(dt: number, inputs: RobotInputs, canJump: boolean): void {
@@ -225,7 +220,7 @@ export class Robot extends Phaser.GameObjects.Container {
     } else if (this.isChargingBellows) {
       // Space released -> Fire Accordion Jump if grounded or within coyote time
       if (canJump) {
-        const baseJump = store.getState().activeBuff === 'jump'
+        const baseJump = this.ctx.activeBuff === 'jump'
           ? Robot.BASE_JUMP_FORCE * 2
           : Robot.BASE_JUMP_FORCE;
         const jumpForce = baseJump + this.bellowsPressure * Robot.MAX_JUMP_BOOST;
@@ -297,9 +292,7 @@ export class Robot extends Phaser.GameObjects.Container {
 
     // Natural drunken sinusoidal sway torque dynamically scaled by Act
     this.wobblePhase += dt * 3.2;
-    const activeAct = store.getState().activeAct || 1;
-    const swayTorqueMultiplier = ACT_SWAY_TORQUES[activeAct] ?? 2.0;
-    const naturalSwayTorque = Math.sin(this.wobblePhase) * swayTorqueMultiplier;
+    const naturalSwayTorque = Math.sin(this.wobblePhase) * this.getDynamicSwayTorque();
 
     // Player Balancing Torque (Left/Right inputs exclusively counter-steer/tilt)
     let controlTorque = 0;
@@ -511,7 +504,7 @@ export class Robot extends Phaser.GameObjects.Container {
     const eyeX = 4;
     const eyeY = -66;
     const eyeGlowPulse = 0.75 + Math.sin(this.wobblePhase * 2) * 0.25 + bellowsRatio * 0.8;
-    const activeBuff = store.getState().activeBuff;
+    const activeBuff = this.ctx.activeBuff;
 
     // Buff-specific visual auras
     if (activeBuff === 'jump') {

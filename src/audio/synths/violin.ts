@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { audioEngine } from '../engine.ts';
+import { BaseInstrument } from './BaseInstrument.ts';
 
 export interface ViolinSynthParams {
   volume?: number;
@@ -9,64 +9,41 @@ export interface ViolinSynthParams {
 }
 
 /**
- * GypsyViolinSynth - Expressive Solo Folk Violin Synthesizer
+ * GypsyViolinSynth - bowed folk violin voice.
  *
- * Models physical acoustic bowed violin mechanics:
- * 1. Bow-Friction Transient: Dynamic envelope simulating horsehair on gut/steel strings.
- * 2. LFO Vibrato Engine: Authentic 5-6 Hz pitch modulation with natural depth.
- * 3. Formant Filter: Peaking wood resonance modeling the acoustic violin cavity.
- * 4. Portamento: Expressive pitch glides for emotive Gypsy/Balkan flourishes.
+ * Sawtooth core with a bow-bite attack, an LFO on detune for vibrato, and a
+ * body resonance filter. Portamento gives the expressive slides.
  */
-export class GypsyViolinSynth {
-  private synth: Tone.Synth;
-  private vibratoLfo: Tone.LFO;
-  private bodyFilter: Tone.Filter;
-  private outputVolume: Tone.Volume;
+export class GypsyViolinSynth extends BaseInstrument {
+  private readonly synth: Tone.Synth;
+  private readonly vibratoLfo: Tone.LFO;
+  private readonly bodyFilter: Tone.Filter;
 
   constructor(params?: ViolinSynthParams) {
-    // 1. Core Bowed String Synthesizer
-    this.synth = new Tone.Synth({
-      oscillator: {
-        type: 'sawtooth',
-      },
-      envelope: {
-        attack: 0.045, // Bow friction bite
-        decay: 0.12,
-        sustain: 0.85,
-        release: 0.18,
-      },
-      portamento: params?.portamento ?? 0.04,
-      volume: -4,
-    });
+    super(params?.volume ?? 0);
 
-    // 2. Continuous Vibrato LFO connected to Detune
+    this.synth = this.track(
+      new Tone.Synth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.045, decay: 0.12, sustain: 0.85, release: 0.18 },
+        portamento: params?.portamento ?? 0.04,
+        volume: -4,
+      })
+    );
+
     const vibratoFreq = params?.vibratoFrequency ?? 5.5;
     const vibratoDepth = params?.vibratoDepth ?? 18; // cents
-    this.vibratoLfo = new Tone.LFO(vibratoFreq, -vibratoDepth, vibratoDepth);
+    this.vibratoLfo = this.track(new Tone.LFO(vibratoFreq, -vibratoDepth, vibratoDepth));
     this.vibratoLfo.connect(this.synth.detune);
     this.vibratoLfo.start();
 
-    // 3. Spruce Body Formant Resonance Filter
-    this.bodyFilter = new Tone.Filter({
-      frequency: 2400,
-      type: 'bandpass',
-      Q: 2.2,
-    });
+    this.bodyFilter = this.track(new Tone.Filter({ frequency: 2400, type: 'bandpass', Q: 2.2 }));
 
-    // 4. Output Stage
-    this.outputVolume = new Tone.Volume(params?.volume ?? 0);
-
-    // Routing: Synth -> Formant Filter -> Output Volume -> Master Bus
     this.synth.connect(this.bodyFilter);
-    this.bodyFilter.connect(this.outputVolume);
-    this.outputVolume.connect(audioEngine.getMasterBus());
+    this.bodyFilter.connect(this.output);
   }
 
-  public triggerAttack(
-    note: Tone.Unit.Frequency,
-    time?: Tone.Unit.Time,
-    velocity = 0.85
-  ): void {
+  public triggerAttack(note: Tone.Unit.Frequency, time?: Tone.Unit.Time, velocity = 0.85): void {
     this.synth.triggerAttack(note, time, velocity);
   }
 
@@ -93,25 +70,8 @@ export class GypsyViolinSynth {
     this.synth.portamento = Math.max(0, Math.min(0.5, glideSeconds));
   }
 
-  public setVolume(decibels: number, rampTime = 0.05): void {
-    if (rampTime > 0) {
-      this.outputVolume.volume.rampTo(decibels, rampTime);
-    } else {
-      this.outputVolume.volume.value = decibels;
-    }
-  }
-
-  public connect(destination: Tone.ToneAudioNode): this {
-    this.outputVolume.disconnect();
-    this.outputVolume.connect(destination);
-    return this;
-  }
-
-  public dispose(): void {
+  public override dispose(): void {
     this.vibratoLfo.stop();
-    this.vibratoLfo.dispose();
-    this.synth.dispose();
-    this.bodyFilter.dispose();
-    this.outputVolume.dispose();
+    super.dispose();
   }
 }

@@ -566,12 +566,19 @@ store.subscribe((state) => {
   });
 });
 
+const RESTING_BELLOWS_PRESSURE = 0.75;
+
 eventBus.on('BELLOWS_COMPRESS', (e) => {
   if (e.isCharging) {
     const dynamicPressure = Math.max(0.1, e.pressure);
     accordion.setBellowsPressure(dynamicPressure, 0.02);
     bellowsSlider.value = String(Math.round(e.pressure * 100));
     bellowsVal.textContent = `${Math.round(e.pressure * 100)}%`;
+  } else {
+    // Release: settle back to the resting pressure instead of staying pinned at the peak.
+    accordion.setBellowsPressure(RESTING_BELLOWS_PRESSURE, 0.15);
+    bellowsSlider.value = String(Math.round(RESTING_BELLOWS_PRESSURE * 100));
+    bellowsVal.textContent = `${Math.round(RESTING_BELLOWS_PRESSURE * 100)}%`;
   }
 });
 
@@ -743,10 +750,9 @@ eventBus.on('VICTORY', () => {
 
 eventBus.on('RESTART_GAME', async () => {
   try {
-    const act1Audio = store.getActDefinition(1).audioConfig;
-    conductor.setScale(act1Audio.scale);
-    conductor.setMeter(act1Audio.meter);
-    conductor.setBpm(act1Audio.bpm);
+    // Rewind the musical clock so the new run starts on bar 1, beat 1.
+    // Act-1 scale/meter/bpm arrive via the ACT_CHANGE that store.reset() emits.
+    conductor.stop();
     await conductor.start();
     btnPlay.classList.add('active');
     btnPause.classList.remove('active');

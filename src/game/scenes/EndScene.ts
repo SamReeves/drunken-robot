@@ -261,7 +261,7 @@ export class EndScene extends Phaser.Scene {
       this.isRestarting = true;
 
       store.reset();
-      eventBus.emit('GAME_START', {});
+      eventBus.emit('RESTART_GAME', {});
 
       this.cameras.main.fade(600, 10, 14, 24);
       this.cameras.main.once('camerafadeoutcomplete', () => {

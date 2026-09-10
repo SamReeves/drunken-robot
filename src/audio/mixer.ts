@@ -8,7 +8,6 @@ export interface ChannelStrip {
   soloNode: Tone.Solo;
   volumeNode: Tone.Volume;
   pannerNode: Tone.Panner;
-  meter: Tone.Meter;
   state: InstrumentChannelState;
 }
 
@@ -79,7 +78,7 @@ const DEFAULT_VOLUMES: Record<InstrumentId, number> = {
  * EnsembleMixer - Additive 6-Track Busking Console
  *
  * Coordinates channel strips, companion recruitment, solo/mute busing,
- * dynamic spatial panning, and real-time peak metering.
+ * and dynamic spatial panning.
  */
 export class EnsembleMixer {
   private channels: Map<InstrumentId, ChannelStrip> = new Map();
@@ -103,14 +102,12 @@ export class EnsembleMixer {
       const soloNode = new Tone.Solo();
       const volumeNode = new Tone.Volume(DEFAULT_VOLUMES[id]);
       const pannerNode = new Tone.Panner(DEFAULT_PANS[id]);
-      const meter = new Tone.Meter();
 
-      // Routing: Input -> Mute Gate -> Solo Node -> Volume -> Panner -> Meter & Master Bus
+      // Routing: Input -> Mute Gate -> Solo Node -> Volume -> Panner -> Master Bus
       inputGain.connect(muteGain);
       muteGain.connect(soloNode);
       soloNode.connect(volumeNode);
       volumeNode.connect(pannerNode);
-      pannerNode.connect(meter);
       pannerNode.connect(audioEngine.getMasterBus());
 
       const state: InstrumentChannelState = {
@@ -128,7 +125,6 @@ export class EnsembleMixer {
         soloNode,
         volumeNode,
         pannerNode,
-        meter,
         state,
       });
     });
@@ -276,19 +272,6 @@ export class EnsembleMixer {
     this.notifyListeners();
   }
 
-  /**
-   * Reads the real-time RMS/peak level in decibels for a channel meter (-Infinity to 0+ dB).
-   */
-  public getChannelMeterLevel(id: InstrumentId): number {
-    const channel = this.channels.get(id);
-    if (!channel) return -100;
-    const val = channel.meter.getValue();
-    if (typeof val === 'number') {
-      return isFinite(val) ? val : -100;
-    }
-    return -100;
-  }
-
   public subscribe(listener: (channels: InstrumentChannelState[]) => void): () => void {
     this.listeners.add(listener);
     listener(this.getAllChannels());
@@ -324,7 +307,6 @@ export class EnsembleMixer {
       channel.soloNode.dispose();
       channel.volumeNode.dispose();
       channel.pannerNode.dispose();
-      channel.meter.dispose();
     });
     this.channels.clear();
     this.listeners.clear();

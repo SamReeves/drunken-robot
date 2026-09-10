@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Robot, type RobotInputs } from '../entities/Robot.ts';
+import { Robot, type RobotContext, type RobotInputs } from '../entities/Robot.ts';
 import { store } from '../../state/store.ts';
 import { eventBus, type BuffType } from '../../state/eventBus.ts';
 
@@ -19,8 +19,20 @@ export class StreetScene extends Phaser.Scene {
   private tipsGroup!: Phaser.Physics.Arcade.Group;
   private hazardsGroup!: Phaser.Physics.Arcade.Group;
   private powerupsGroup!: Phaser.Physics.Arcade.Group;
+  private static readonly POWERUP_INITIAL_DELAY_MS = 8000;
+  private static readonly POWERUP_RETRY_DELAY_MS = 2500;
+  private static readonly POWERUP_MIN_INTERVAL_MS = 14000;
+  private static readonly POWERUP_MAX_INTERVAL_MS = 22000;
+  private static readonly POWERUP_SPAWN_CHANCE = 0.4;
+  private static readonly BUFF_DURATION_SEC = 12;
+  private static readonly HAZARD_SPECS = {
+    crate: { width: 38, height: 38, y: 562 },
+    puddle: { width: 52, height: 14, y: 576 },
+  } as const;
+
   private nextSpawnX = 750;
-  private nextPowerupSpawnTime = 8000;
+  /** Countdown (ms) until the next power-up roll. Scene-relative, so restarts behave. */
+  private powerupCooldownMs = StreetScene.POWERUP_INITIAL_DELAY_MS;
 
   // Keyboard Inputs
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -49,6 +61,7 @@ export class StreetScene extends Phaser.Scene {
   private isVictory = false;
   private isPaused = false;
   private hasAutoCollapsedSidebar = false;
+  private restartRequested = false;
   private unsubActChange?: () => void;
   private unsubGameOver?: () => void;
   private unsubVictory?: () => void;
@@ -70,7 +83,13 @@ export class StreetScene extends Phaser.Scene {
     this.isVictory = false;
     this.isPaused = store.isPaused();
     this.hasAutoCollapsedSidebar = false;
-    this.nextPowerupSpawnTime = 8000;
+    this.restartRequested = false;
+    this.powerupCooldownMs = StreetScene.POWERUP_INITIAL_DELAY_MS;
+
+    // Tear down anything left from a previous run of this scene *before* registering
+    // new listeners; doing it afterwards silently removed the P/ESC pause handlers.
+    this.cleanupListeners();
+    this.physics.resume();
 
     // 1. Create Parallax Layers pinned to camera viewport (setScrollFactor(0))
     const skyLayer = this.add.tileSprite(0, 0, width, height, 'bg_sky').setOrigin(0, 0).setScrollFactor(0);
@@ -115,9 +134,9 @@ export class StreetScene extends Phaser.Scene {
     this.physics.add.collider(this.robot, this.groundPlatform);
 
     // 5. Overlap Handlers (Collecting Tips, Hitting Hazards & Power-Ups)
-    this.physics.add.overlap(this.robot, this.tipsGroup, this.handleCollectTip as any, undefined, this);
-    this.physics.add.overlap(this.robot, this.hazardsGroup, this.handleHitHazard as any, undefined, this);
-    this.physics.add.overlap(this.robot, this.powerupsGroup, this.handleCollectPowerup as any, undefined, this);
+    this.physics.add.overlap(this.robot, this.tipsGroup, (_robot, obj) => this.handleCollectTip(obj as Phaser.Physics.Arcade.Sprite));
+    this.physics.add.overlap(this.robot, this.hazardsGroup, (_robot, obj) => this.handleHitHazard(obj as Phaser.Physics.Arcade.Sprite));
+    this.physics.add.overlap(this.robot, this.powerupsGroup, (_robot, obj) => this.handleCollectPowerup(obj as Phaser.Physics.Arcade.Sprite));
 
     // 6. Smooth Camera Tracking & Vertical Axis Lock
     this.cameras.main.startFollow(this.robot, true, 0.08, 0.08, -140, 50);
@@ -130,8 +149,6 @@ export class StreetScene extends Phaser.Scene {
     this.setupOverlayUI(width);
 
     // 9. Register EventBus Listeners
-    this.cleanupListeners();
-
     this.unsubActChange = eventBus.on('ACT_CHANGE', (payload) => {
       this.handleActTransition(payload.act, payload.name);
     });
@@ -372,10 +389,7 @@ export class StreetScene extends Phaser.Scene {
     switch (scenario) {
       case 0: {
         // Crate Hazard on Ground + Parabolic Tip Arc
-        const crate = this.hazardsGroup.create(spawnX, 562, crateKey) as Phaser.Physics.Arcade.Sprite;
-        crate.setOrigin(0.5, 0.5);
-        (crate.body as Phaser.Physics.Arcade.Body)?.setSize(38, 38);
-        crate.setData('hazardType', 'crate');
+        this.spawnHazard(spawnX, 'crate', crateKey);
 
         // Tip Arc (3 gears)
         this.createTip(spawnX - 55, 510);
@@ -385,10 +399,7 @@ export class StreetScene extends Phaser.Scene {
       }
       case 1: {
         // Murky Puddle Hazard + High Bonus Tip
-        const puddle = this.hazardsGroup.create(spawnX, 576, puddleKey) as Phaser.Physics.Arcade.Sprite;
-        puddle.setOrigin(0.5, 0.5);
-        (puddle.body as Phaser.Physics.Arcade.Body)?.setSize(52, 14);
-        puddle.setData('hazardType', 'puddle');
+        this.spawnHazard(spawnX, 'puddle', puddleKey);
 
         this.createTip(spawnX, 465);
         this.createTip(spawnX + 70, 520);
@@ -402,16 +413,9 @@ export class StreetScene extends Phaser.Scene {
         break;
       }
       case 3: {
-        // Double Crate Hurdle (Tightened to 45px for single wide hurdle) + Jump Arc (4 tips)
-        const crate1 = this.hazardsGroup.create(spawnX, 562, crateKey) as Phaser.Physics.Arcade.Sprite;
-        crate1.setOrigin(0.5, 0.5);
-        (crate1.body as Phaser.Physics.Arcade.Body)?.setSize(38, 38);
-        crate1.setData('hazardType', 'crate');
-
-        const crate2 = this.hazardsGroup.create(spawnX + 45, 562, crateKey) as Phaser.Physics.Arcade.Sprite;
-        crate2.setOrigin(0.5, 0.5);
-        (crate2.body as Phaser.Physics.Arcade.Body)?.setSize(38, 38);
-        crate2.setData('hazardType', 'crate');
+        // Double Crate Hurdle (45px apart reads as one wide hurdle) + Jump Arc (4 tips)
+        this.spawnHazard(spawnX, 'crate', crateKey);
+        this.spawnHazard(spawnX + 45, 'crate', crateKey);
 
         this.createTip(spawnX - 25, 495);
         this.createTip(spawnX + 5, 435);
@@ -422,6 +426,21 @@ export class StreetScene extends Phaser.Scene {
     }
 
     this.nextSpawnX += Phaser.Math.Between(360, 540);
+  }
+
+  private spawnHazard(x: number, kind: 'crate' | 'puddle', textureKey: string): Phaser.Physics.Arcade.Sprite {
+    const spec = StreetScene.HAZARD_SPECS[kind];
+    const hazard = this.hazardsGroup.create(x, spec.y, textureKey) as Phaser.Physics.Arcade.Sprite;
+    hazard.setOrigin(0.5, 0.5);
+    (hazard.body as Phaser.Physics.Arcade.Body | null)?.setSize(spec.width, spec.height);
+    hazard.setData('hazardType', kind);
+    return hazard;
+  }
+
+  /** Destroys a pooled sprite and any tweens still targeting it (bobbing tips leaked otherwise). */
+  private destroyEntity(sprite: Phaser.GameObjects.GameObject): void {
+    this.tweens.killTweensOf(sprite);
+    sprite.destroy();
   }
 
   private createTip(x: number, y: number): Phaser.Physics.Arcade.Sprite {
@@ -442,14 +461,13 @@ export class StreetScene extends Phaser.Scene {
     return tip;
   }
 
-  private handleCollectTip(_robot: any, tipObj: any): void {
-    const tip = tipObj as Phaser.Physics.Arcade.Sprite;
+  private handleCollectTip(tip: Phaser.Physics.Arcade.Sprite): void {
     if (!tip.active) return;
 
     const tx = tip.x;
     const ty = tip.y;
     tip.disableBody(true, true);
-    tip.destroy();
+    this.destroyEntity(tip);
 
     store.addTips(1);
 
@@ -471,8 +489,7 @@ export class StreetScene extends Phaser.Scene {
     });
   }
 
-  private handleCollectPowerup(_robot: any, powerupObj: any): void {
-    const powerup = powerupObj as Phaser.Physics.Arcade.Sprite;
+  private handleCollectPowerup(powerup: Phaser.Physics.Arcade.Sprite): void {
     if (!powerup.active) return;
 
     const px = powerup.x;
@@ -480,10 +497,9 @@ export class StreetScene extends Phaser.Scene {
     const buffType = powerup.getData('buffType') as BuffType;
 
     powerup.disableBody(true, true);
-    powerup.destroy();
+    this.destroyEntity(powerup);
 
-    // Activate 12-second gameplay buff
-    store.activateBuff(buffType, 12);
+    store.activateBuff(buffType, StreetScene.BUFF_DURATION_SEC);
 
     let indicator = 'POWER UP!';
     let textColor = '#ffffff';
@@ -523,8 +539,7 @@ export class StreetScene extends Phaser.Scene {
     });
   }
 
-  private handleHitHazard(_robot: any, hazardObj: any): void {
-    const hazard = hazardObj as Phaser.Physics.Arcade.Sprite;
+  private handleHitHazard(hazard: Phaser.Physics.Arcade.Sprite): void {
     if (!hazard.active || hazard.getData('hit')) return;
 
     // Super Jump & Hazard Invulnerability Buff Bypass
@@ -544,7 +559,7 @@ export class StreetScene extends Phaser.Scene {
         scaleY: 0.6,
         duration: 400,
         ease: 'Cubic.easeIn',
-        onComplete: () => hazard.destroy(),
+        onComplete: () => this.destroyEntity(hazard),
       });
 
       // Floating "SMASHED! ⚡" feedback indicator
@@ -609,26 +624,15 @@ export class StreetScene extends Phaser.Scene {
   private recycleOffscreenEntities(): void {
     const despawnX = this.cameras.main.scrollX - 250;
 
-    this.tipsGroup.getChildren().forEach((child) => {
-      const sprite = child as Phaser.Physics.Arcade.Sprite;
-      if (sprite.x < despawnX) {
-        sprite.destroy();
+    for (const group of [this.tipsGroup, this.hazardsGroup, this.powerupsGroup]) {
+      // Copy: destroying mutates the group's child list while iterating.
+      for (const child of [...group.getChildren()]) {
+        const sprite = child as Phaser.Physics.Arcade.Sprite;
+        if (sprite.x < despawnX) {
+          this.destroyEntity(sprite);
+        }
       }
-    });
-
-    this.hazardsGroup.getChildren().forEach((child) => {
-      const sprite = child as Phaser.Physics.Arcade.Sprite;
-      if (sprite.x < despawnX) {
-        sprite.destroy();
-      }
-    });
-
-    this.powerupsGroup.getChildren().forEach((child) => {
-      const sprite = child as Phaser.Physics.Arcade.Sprite;
-      if (sprite.x < despawnX) {
-        sprite.destroy();
-      }
-    });
+    }
   }
 
   private updateHUD(width: number): void {
@@ -688,7 +692,7 @@ export class StreetScene extends Phaser.Scene {
     this.hudBalanceGauge.fillStyle(0x52525b, 0.8);
     this.hudBalanceGauge.fillRect(barX + barW / 2 - 1, gaugeY, 2, 10);
 
-    const needleOffset = (wobbleAngle / 0.38) * (barW / 2 - 8);
+    const needleOffset = (wobbleAngle / this.robot.getDynamicStabilityThreshold()) * (barW / 2 - 8);
     const needleX = Phaser.Math.Clamp(barX + barW / 2 + needleOffset, barX + 4, barX + barW - 4);
     const needleColor = isStumbling ? 0xef4444 : stabilityRatio > 0.75 ? 0xf59e0b : 0x10b981;
 
@@ -748,7 +752,11 @@ export class StreetScene extends Phaser.Scene {
       this.activeBuffBadgeBg.strokeRoundedRect(badgeX, badgeY, badgeW, badgeH, 6);
 
       // Remaining duration bar beneath text
-      const progressRatio = Phaser.Math.Clamp(gameState.buffTimeRemaining / (gameState.buffDuration || 12), 0, 1);
+      const progressRatio = Phaser.Math.Clamp(
+        gameState.buffTimeRemaining / (gameState.buffDuration || StreetScene.BUFF_DURATION_SEC),
+        0,
+        1
+      );
       this.activeBuffBadgeBg.fillStyle(badgeStroke, 0.7);
       this.activeBuffBadgeBg.fillRoundedRect(badgeX + 4, badgeY + badgeH - 4, (badgeW - 8) * progressRatio, 2, 1);
 
@@ -761,17 +769,19 @@ export class StreetScene extends Phaser.Scene {
     }
   }
 
-  private spawnFloatingPowerups(time: number): void {
-    if (time < this.nextPowerupSpawnTime) return;
+  private spawnFloatingPowerups(delta: number): void {
+    this.powerupCooldownMs -= delta;
+    if (this.powerupCooldownMs > 0) return;
 
-    // Low-chance check: 40% chance every check cycle
-    if (Math.random() > 0.4) {
-      this.nextPowerupSpawnTime = time + 2500;
+    if (Math.random() > StreetScene.POWERUP_SPAWN_CHANCE) {
+      this.powerupCooldownMs = StreetScene.POWERUP_RETRY_DELAY_MS;
       return;
     }
 
-    // Interval between 14 and 22 seconds
-    this.nextPowerupSpawnTime = time + Phaser.Math.Between(14000, 22000);
+    this.powerupCooldownMs = Phaser.Math.Between(
+      StreetScene.POWERUP_MIN_INTERVAL_MS,
+      StreetScene.POWERUP_MAX_INTERVAL_MS
+    );
 
     const cameraRightEdge = this.cameras.main.scrollX + this.scale.width + 60;
     const baseY = Phaser.Math.Between(410, 490);
@@ -827,14 +837,14 @@ export class StreetScene extends Phaser.Scene {
       jump: jumpDown,
     };
 
-    // 3. Update Robot Entity
-    if (this.robot) {
-      this.robot.update(time, delta, inputs);
-    }
+    // 3. Update Robot Entity with a per-frame snapshot of the state it needs
+    const state = store.getState();
+    const ctx: RobotContext = { activeAct: state.activeAct, activeBuff: state.activeBuff };
+    this.robot.update(time, delta, inputs, ctx);
 
     // 4. Procedural Spawner, Power-Up Wave & Recycling
     this.spawnObstaclesAndTips();
-    this.spawnFloatingPowerups(time);
+    this.spawnFloatingPowerups(delta);
     this.updatePowerupSinusoidalDrift(time);
     this.recycleOffscreenEntities();
 
@@ -853,8 +863,27 @@ export class StreetScene extends Phaser.Scene {
       eventBus.emit('UI_SET_SIDEBAR', { collapsed: true });
     }
 
-    // 7. Update HUD
+    // 7. Deliver coalesced store updates (at most one per frame), then draw the HUD
+    store.flush();
     this.updateHUD(this.scale.width);
+  }
+
+  /**
+   * The single restart path. Resumes physics (game over and pause both pause it),
+   * kills every tween so nothing outlives the scene, resets the run, and tells the
+   * audio layer to start over from Act 1.
+   */
+  private restartRun(): void {
+    if (this.restartRequested) return;
+    this.restartRequested = true;
+
+    this.hidePauseOverlay();
+    this.physics.resume();
+    this.tweens.killAll();
+    store.setPaused(false);
+    store.reset();
+    eventBus.emit('RESTART_GAME', {});
+    this.scene.restart();
   }
 
   private handleGameOver(distanceTraveled: number, tips: number): void {
@@ -960,15 +989,16 @@ export class StreetScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    const restartAction = (): void => {
-      store.reset();
-      eventBus.emit('RESTART_GAME', {});
-      this.scene.restart();
-    };
+    const restartAction = (): void => this.restartRun();
 
     hitZone.on('pointerdown', restartAction);
-    this.input.keyboard?.once('keydown-SPACE', restartAction);
-    this.input.keyboard?.once('keydown-ENTER', restartAction);
+    // Space is also the jump key. Wait for a release, and only after a short delay,
+    // so a player still holding jump at the moment of death cannot skip this screen.
+    this.time.delayedCall(500, () => {
+      if (!this.isGameOver) return;
+      this.input.keyboard?.once('keyup-SPACE', restartAction);
+      this.input.keyboard?.once('keydown-ENTER', restartAction);
+    });
 
     overlay.add([backdrop, card, title, desc, stats, btnContainer, hitZone]);
     this.gameOverOverlay = overlay;
@@ -997,21 +1027,19 @@ export class StreetScene extends Phaser.Scene {
 
   private handlePauseChange(paused: boolean): void {
     if (this.isGameOver || this.isVictory) return;
-    if (this.isPaused === paused && !paused && !this.pauseOverlay) return;
+    if (this.isPaused === paused) return;
 
     this.isPaused = paused;
 
     if (paused) {
       this.physics.pause();
-      if (this.robot) {
-        this.tweens.getTweensOf(this.robot).forEach((t) => t.pause());
-      }
+      this.tweens.pauseAll();
+      this.time.paused = true;
       this.showPauseOverlay();
     } else {
       this.physics.resume();
-      if (this.robot) {
-        this.tweens.getTweensOf(this.robot).forEach((t) => t.resume());
-      }
+      this.tweens.resumeAll();
+      this.time.paused = false;
       this.hidePauseOverlay();
     }
   }
@@ -1126,13 +1154,7 @@ export class StreetScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    const restartAction = (): void => {
-      this.hidePauseOverlay();
-      store.setPaused(false);
-      store.reset();
-      eventBus.emit('RESTART_GAME', {});
-      this.scene.restart();
-    };
+    const restartAction = (): void => this.restartRun();
 
     restartHit.on('pointerdown', restartAction);
 
@@ -1145,16 +1167,12 @@ export class StreetScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const onKeyR = (event: KeyboardEvent) => {
-      if (event.code === 'KeyR' && this.isPaused) {
-        window.removeEventListener('keydown', onKeyR);
-        restartAction();
-      }
+    const onKeyR = (): void => {
+      if (this.isPaused) restartAction();
     };
-    window.addEventListener('keydown', onKeyR);
-
+    this.input.keyboard?.on('keydown-R', onKeyR);
     overlay.once('destroy', () => {
-      window.removeEventListener('keydown', onKeyR);
+      this.input.keyboard?.off('keydown-R', onKeyR);
     });
 
     overlay.add([

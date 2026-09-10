@@ -197,10 +197,15 @@ export class GameStore {
     buffDuration: 0,
   };
 
-  private listeners: Set<(state: GameState) => void> = new Set();
+  private listeners: Set<(state: Readonly<GameState>) => void> = new Set();
+  private dirty = false;
 
+  /**
+   * Returns the live state object. Callers must treat it as read-only;
+   * it is replaced wholesale on reset(), so do not cache it across runs.
+   */
   public getState(): Readonly<GameState> {
-    return { ...this.state, activeInstruments: [...this.state.activeInstruments] };
+    return this.state;
   }
 
   public getElapsedTime(): number {
@@ -264,7 +269,7 @@ export class GameStore {
     if (this.state.buffTimeRemaining <= 0) {
       this.deactivateBuff();
     } else {
-      this.notify();
+      this.markDirty();
     }
   }
 
@@ -277,8 +282,6 @@ export class GameStore {
     this.adjustMomentum(8 * earnedTips);
 
     eventBus.emit('TIP_COLLECTED', {
-      x: 0,
-      y: 0,
       totalTips: this.state.tips,
       momentum: this.state.momentum,
     });
@@ -319,12 +322,11 @@ export class GameStore {
       this.triggerGameOver();
     }
 
-    this.notify();
-  }
-
-  public setMomentum(value: number): void {
-    const delta = value - this.state.momentum;
-    this.adjustMomentum(delta);
+    if (this.state.momentumTier !== prevTier) {
+      this.notify();
+    } else {
+      this.markDirty();
+    }
   }
 
   public applyStumblePenalty(): void {
@@ -350,6 +352,7 @@ export class GameStore {
     if (distance === this.state.distanceTraveled) return;
 
     this.state.distanceTraveled = distance;
+    this.markDirty();
     this.checkActProgression();
 
     if (this.state.distanceTraveled >= VICTORY_DISTANCE) {
@@ -426,10 +429,16 @@ export class GameStore {
       buffTimeRemaining: 0,
       buffDuration: 0,
     };
+    // A fresh run always begins in Act 1; announce it so audio and visuals
+    // re-apply the act-1 configuration instead of inheriting the last run's.
+    eventBus.emit('ACT_CHANGE', {
+      act: ACT_DEFINITIONS[0].act,
+      name: ACT_DEFINITIONS[0].name,
+    });
     this.notify();
   }
 
-  public subscribe(listener: (state: GameState) => void): () => void {
+  public subscribe(listener: (state: Readonly<GameState>) => void): () => void {
     this.listeners.add(listener);
     listener(this.getState());
     return () => {
@@ -450,11 +459,27 @@ export class GameStore {
     this.state.activeInstruments = [...matchedTier.instruments];
   }
 
+  /**
+   * Marks the state as changed without notifying. High-frequency mutations
+   * (decay, buff timers, distance) use this; the scene calls flush() once per
+   * frame so subscribers see at most one update per frame.
+   */
+  private markDirty(): void {
+    this.dirty = true;
+  }
+
+  /** Delivers a pending coalesced update, if any. Call once per frame. */
+  public flush(): void {
+    if (!this.dirty) return;
+    this.notify();
+  }
+
+  /** Immediate notification for discrete transitions (tier, act, pause, buffs, game over). */
   private notify(): void {
-    const current = this.getState();
+    this.dirty = false;
     for (const listener of this.listeners) {
       try {
-        listener(current);
+        listener(this.state);
       } catch (err) {
         console.error('[GameStore] Error in subscriber callback:', err);
       }
