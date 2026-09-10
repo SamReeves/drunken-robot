@@ -35,11 +35,11 @@ export class UprightBassSynth extends BaseInstrument {
           exponent: 2,
         },
         volume: -2,
-      })
+      }),
     );
 
     this.bodyFilter = this.track(
-      new Tone.Filter({ frequency: 180, type: 'peaking', gain: params?.bodyResonance ?? 4.5, Q: 1.8 })
+      new Tone.Filter({ frequency: 180, type: 'peaking', gain: params?.bodyResonance ?? 4.5, Q: 1.8 }),
     );
 
     this.synth.connect(this.bodyFilter);
@@ -58,7 +58,7 @@ export class UprightBassSynth extends BaseInstrument {
     note: Tone.Unit.Frequency,
     duration: Tone.Unit.Time,
     time?: Tone.Unit.Time,
-    velocity = 0.85
+    velocity = 0.85,
   ): void {
     this.synth.triggerAttackRelease(note, duration, time, velocity);
   }

@@ -8,13 +8,7 @@ import { FlamencoGuitarSynth } from './synths/guitar.ts';
 import { GypsyViolinSynth } from './synths/violin.ts';
 import { KlezmerClarinetSynth } from './synths/clarinet.ts';
 import { getScaleNotes, getScaleDegreeNote, getTriadChord } from './scales.ts';
-import type {
-  ConductorListener,
-  ConductorStepEvent,
-  InstrumentId,
-  MeterType,
-  ScaleName,
-} from './types.ts';
+import type { ConductorListener, ConductorStepEvent, InstrumentId, MeterType, ScaleName } from './types.ts';
 
 interface MeterStructure {
   totalSteps: number;
@@ -84,7 +78,7 @@ export class Conductor {
       guitar?: FlamencoGuitarSynth;
       violin?: GypsyViolinSynth;
       clarinet?: KlezmerClarinetSynth;
-    }
+    },
   ) {
     this.mixer = mixer ?? new EnsembleMixer();
 
@@ -273,7 +267,9 @@ export class Conductor {
       } else if (step === 2 && groupLength === 3) {
         // Asymmetric anticipation click in 3-length pulse
         this.percussion.triggerCastanet(time, 0.6);
-        triggers.percussion = triggers.percussion ? `${triggers.percussion} + Castanet Roll` : 'Castanet Roll';
+        triggers.percussion = triggers.percussion
+          ? `${triggers.percussion} + Castanet Roll`
+          : 'Castanet Roll';
       }
 
       // C. Continuous Shaker / Tambourine subdivision
@@ -327,7 +323,7 @@ export class Conductor {
       // ==========================================
       // Sings expressive high-register melodies on downbeats & flourishes
       if (step === 0) {
-        const leadDegree = (measure % 4 === 0) ? 1 : (measure % 4 === 1) ? 3 : (measure % 4 === 2) ? 5 : 8;
+        const leadDegree = measure % 4 === 0 ? 1 : measure % 4 === 1 ? 3 : measure % 4 === 2 ? 5 : 8;
         const violinNote = getScaleDegreeNote(this.activeScale, leadDegree, 5);
         this.violin.triggerAttackRelease(violinNote, '4n', time, 0.85);
         triggers.violin = violinNote;

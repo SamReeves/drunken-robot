@@ -11,18 +11,21 @@ export interface ChannelStrip {
   state: InstrumentChannelState;
 }
 
-const DEFAULT_CHANNEL_CONFIGS: Record<InstrumentId, Omit<InstrumentChannelState, 'recruited' | 'muted' | 'solo' | 'volume' | 'pan'>> = {
+const DEFAULT_CHANNEL_CONFIGS: Record<
+  InstrumentId,
+  Omit<InstrumentChannelState, 'recruited' | 'muted' | 'solo' | 'volume' | 'pan'>
+> = {
   accordion: {
     id: 'accordion',
     name: 'Accordion',
-    displayName: 'Melinda\'s Accordion',
+    displayName: "Melinda's Accordion",
     role: 'Lead Melody & Bellows Swells',
     color: '#f59e0b',
   },
   bass: {
     id: 'bass',
     name: 'Upright Bass',
-    displayName: 'Pavel\'s Double Bass',
+    displayName: "Pavel's Double Bass",
     role: 'Grounding Rhythmic Sub-Pulse',
     color: '#d97706',
   },
@@ -36,21 +39,21 @@ const DEFAULT_CHANNEL_CONFIGS: Record<InstrumentId, Omit<InstrumentChannelState,
   guitar: {
     id: 'guitar',
     name: 'Flamenco Guitar',
-    displayName: 'Mateo\'s Flamenco Guitar',
+    displayName: "Mateo's Flamenco Guitar",
     role: 'Rasgueado Comping & Chords',
     color: '#eab308',
   },
   violin: {
     id: 'violin',
     name: 'Gypsy Violin',
-    displayName: 'Elena\'s Gypsy Violin',
+    displayName: "Elena's Gypsy Violin",
     role: 'Lyrical Lead & Vibrato Flourishes',
     color: '#a855f7',
   },
   clarinet: {
     id: 'clarinet',
     name: 'Klezmer Clarinet',
-    displayName: 'Yitzhak\'s Klezmer Clarinet',
+    displayName: "Yitzhak's Klezmer Clarinet",
     role: 'Woody Counterpoint & Krekhts Glides',
     color: '#06b6d4',
   },
@@ -85,14 +88,7 @@ export class EnsembleMixer {
   private listeners: Set<(channels: InstrumentChannelState[]) => void> = new Set();
 
   constructor() {
-    const instrumentIds: InstrumentId[] = [
-      'accordion',
-      'bass',
-      'percussion',
-      'guitar',
-      'violin',
-      'clarinet',
-    ];
+    const instrumentIds: InstrumentId[] = ['accordion', 'bass', 'percussion', 'guitar', 'violin', 'clarinet'];
 
     instrumentIds.forEach((id) => {
       const isDefaultRecruited = id === 'accordion'; // Accordion unlocked from start

@@ -29,7 +29,7 @@ export class PercussionSynth extends BaseInstrument {
         noise: { type: 'pink' },
         envelope: { attack: 0.001, decay: 0.04, sustain: 0 },
         volume: 3,
-      })
+      }),
     );
     this.castanetNoise.connect(this.castanetFilter);
 
@@ -40,7 +40,7 @@ export class PercussionSynth extends BaseInstrument {
         oscillator: { type: 'sine' },
         envelope: { attack: 0.002, decay: 0.22, sustain: 0.01, release: 0.2 },
         volume: -2,
-      })
+      }),
     );
 
     this.shakerNoise = this.track(
@@ -48,7 +48,7 @@ export class PercussionSynth extends BaseInstrument {
         noise: { type: 'white' },
         envelope: { attack: 0.005, decay: 0.065, sustain: 0 },
         volume: -6,
-      })
+      }),
     );
 
     this.metalSynth = this.track(
@@ -59,7 +59,7 @@ export class PercussionSynth extends BaseInstrument {
         resonance: 4000,
         octaves: 1.2,
         volume: -14,
-      })
+      }),
     );
     this.metalSynth.frequency.value = 380;
 

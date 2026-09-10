@@ -28,7 +28,7 @@ export class GypsyViolinSynth extends BaseInstrument {
         envelope: { attack: 0.045, decay: 0.12, sustain: 0.85, release: 0.18 },
         portamento: params?.portamento ?? 0.04,
         volume: -4,
-      })
+      }),
     );
 
     const vibratoFreq = params?.vibratoFrequency ?? 5.5;
@@ -55,7 +55,7 @@ export class GypsyViolinSynth extends BaseInstrument {
     note: Tone.Unit.Frequency,
     duration: Tone.Unit.Time,
     time?: Tone.Unit.Time,
-    velocity = 0.85
+    velocity = 0.85,
   ): void {
     this.synth.triggerAttackRelease(note, duration, time, velocity);
   }

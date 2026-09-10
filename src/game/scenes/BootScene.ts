@@ -9,7 +9,7 @@ function drawQuad(
   cy: number,
   p1x: number,
   p1y: number,
-  segments: number = 8
+  segments: number = 8,
 ): void {
   for (let i = 1; i <= segments; i++) {
     const t = i / segments;
@@ -31,21 +31,13 @@ function drawCubic(
   c2y: number,
   p1x: number,
   p1y: number,
-  segments: number = 10
+  segments: number = 10,
 ): void {
   for (let i = 1; i <= segments; i++) {
     const t = i / segments;
     const inv = 1 - t;
-    const x =
-      inv * inv * inv * p0x +
-      3 * inv * inv * t * c1x +
-      3 * inv * t * t * c2x +
-      t * t * t * p1x;
-    const y =
-      inv * inv * inv * p0y +
-      3 * inv * inv * t * c1y +
-      3 * inv * t * t * c2y +
-      t * t * t * p1y;
+    const x = inv * inv * inv * p0x + 3 * inv * inv * t * c1x + 3 * inv * t * t * c2x + t * t * t * p1x;
+    const y = inv * inv * inv * p0y + 3 * inv * inv * t * c1y + 3 * inv * t * t * c2y + t * t * t * p1y;
     gfx.lineTo(x, y);
   }
 }
@@ -61,7 +53,7 @@ function bezierCurveTo(
   c2y: number,
   p1x: number,
   p1y: number,
-  segments: number = 10
+  segments: number = 10,
 ): void {
   drawCubic(gfx, p0x, p0y, c1x, c1y, c2x, c2y, p1x, p1y, segments);
 }
@@ -71,7 +63,7 @@ function drawSmoothClosedSpline(
   gfx: Phaser.GameObjects.Graphics,
   pts: [number, number][],
   offsetX: number = 0,
-  offsetY: number = 0
+  offsetY: number = 0,
 ): void {
   const len = pts.length;
   const startMidX = (pts[0][0] + pts[1][0]) / 2 + offsetX;
@@ -153,12 +145,30 @@ export class BootScene extends Phaser.Scene {
     }
 
     const starCoords: [number, number, number, number][] = [
-      [120, 80, 2.0, 0.85], [240, 160, 1.4, 0.7], [380, 70, 2.2, 0.9], [520, 130, 1.2, 0.6],
-      [680, 60, 2.0, 0.8], [820, 110, 1.4, 0.75], [950, 50, 1.8, 0.85], [1180, 90, 2.0, 0.9],
-      [180, 220, 1.2, 0.6], [450, 190, 1.6, 0.7], [760, 210, 1.3, 0.65], [1120, 200, 1.5, 0.75],
-      [60, 150, 1.8, 0.8], [310, 110, 1.2, 0.65], [600, 150, 1.6, 0.7], [890, 85, 2.0, 0.85],
-      [1020, 210, 1.3, 0.6], [40, 40, 1.5, 0.7], [710, 100, 1.9, 0.85], [980, 170, 1.3, 0.65],
-      [160, 120, 1.0, 0.5], [550, 80, 1.5, 0.7], [860, 160, 1.2, 0.6], [1230, 140, 1.7, 0.8]
+      [120, 80, 2.0, 0.85],
+      [240, 160, 1.4, 0.7],
+      [380, 70, 2.2, 0.9],
+      [520, 130, 1.2, 0.6],
+      [680, 60, 2.0, 0.8],
+      [820, 110, 1.4, 0.75],
+      [950, 50, 1.8, 0.85],
+      [1180, 90, 2.0, 0.9],
+      [180, 220, 1.2, 0.6],
+      [450, 190, 1.6, 0.7],
+      [760, 210, 1.3, 0.65],
+      [1120, 200, 1.5, 0.75],
+      [60, 150, 1.8, 0.8],
+      [310, 110, 1.2, 0.65],
+      [600, 150, 1.6, 0.7],
+      [890, 85, 2.0, 0.85],
+      [1020, 210, 1.3, 0.6],
+      [40, 40, 1.5, 0.7],
+      [710, 100, 1.9, 0.85],
+      [980, 170, 1.3, 0.65],
+      [160, 120, 1.0, 0.5],
+      [550, 80, 1.5, 0.7],
+      [860, 160, 1.2, 0.6],
+      [1230, 140, 1.7, 0.8],
     ];
     for (const [sx, sy, sr, sa] of starCoords) {
       skyGfx.fillStyle(0xffffff, sa);
@@ -179,8 +189,8 @@ export class BootScene extends Phaser.Scene {
     const distMists = [
       { x: 260, y: 510, rx: 360, ry: 75, color: 0x182030, alpha: 0.22 },
       { x: 740, y: 495, rx: 400, ry: 80, color: 0x201c2e, alpha: 0.18 },
-      { x: 1140, y: 520, rx: 340, ry: 70, color: 0x161e2c, alpha: 0.20 },
-      { x: -20, y: 525, rx: 320, ry: 65, color: 0x182030, alpha: 0.18 }
+      { x: 1140, y: 520, rx: 340, ry: 70, color: 0x161e2c, alpha: 0.2 },
+      { x: -20, y: 525, rx: 320, ry: 65, color: 0x182030, alpha: 0.18 },
     ];
     for (const dm of distMists) {
       distGfx.fillStyle(dm.color, dm.alpha);
@@ -201,7 +211,7 @@ export class BootScene extends Phaser.Scene {
       { x: 985, w: 80, h: 380, peak: 90, style: 'spire', chimney: false },
       { x: 1055, w: 125, h: 275, peak: 40, style: 'dome', chimney: true },
       { x: 1170, w: 95, h: 305, peak: 50, style: 'gable', chimney: true },
-      { x: 1255, w: 90, h: 340, peak: 70, style: 'spire', chimney: false }
+      { x: 1255, w: 90, h: 340, peak: 70, style: 'spire', chimney: false },
     ];
 
     distGfx.fillStyle(0x131722, 1);
@@ -216,7 +226,16 @@ export class BootScene extends Phaser.Scene {
         distGfx.lineTo(b.x + b.w * 0.8, topY + b.peak);
       } else if (b.style === 'dome') {
         distGfx.lineTo(b.x + 8, topY + b.peak);
-        drawQuad(distGfx, b.x + 8, topY + b.peak, b.x + b.w * 0.5, topY - 12, b.x + b.w - 8, topY + b.peak, 8);
+        drawQuad(
+          distGfx,
+          b.x + 8,
+          topY + b.peak,
+          b.x + b.w * 0.5,
+          topY - 12,
+          b.x + b.w - 8,
+          topY + b.peak,
+          8,
+        );
       } else if (b.style === 'mansard') {
         distGfx.lineTo(b.x + 14, topY + b.peak);
         distGfx.lineTo(b.x + b.w * 0.3, topY);
@@ -244,7 +263,7 @@ export class BootScene extends Phaser.Scene {
       { x: 180, y: 620, rx: 280, ry: 45, alpha: 0.16 },
       { x: 540, y: 610, rx: 340, ry: 50, alpha: 0.18 },
       { x: 920, y: 625, rx: 320, ry: 48, alpha: 0.15 },
-      { x: 1240, y: 615, rx: 260, ry: 42, alpha: 0.17 }
+      { x: 1240, y: 615, rx: 260, ry: 42, alpha: 0.17 },
     ];
     for (const bm of baseMists) {
       distGfx.fillStyle(0x1c2436, bm.alpha);
@@ -301,113 +320,157 @@ export class BootScene extends Phaser.Scene {
     const midBuildings: MidBuildingDef[] = [
       {
         name: 'The Drunken Accordion Tavern',
-        x: 0, w: 180, h: 445, roofHeight: 80, roofType: 'gambrel', sag: 7, lean: -3,
-        hasSign: true, signText: 'ZINC', hasLantern: true,
+        x: 0,
+        w: 180,
+        h: 445,
+        roofHeight: 80,
+        roofType: 'gambrel',
+        sag: 7,
+        lean: -3,
+        hasSign: true,
+        signText: 'ZINC',
+        hasLantern: true,
         chimney: { xRel: 135, w: 22, h: 42, style: 'brick' },
         timberBeams: [
           { x1: 15, y1: 140, x2: 165, y2: 240, warp: 4 },
           { x1: 165, y1: 140, x2: 15, y2: 240, warp: -3 },
-          { x1: 12, y1: 250, x2: 168, y2: 250, warp: 3 }
+          { x1: 12, y1: 250, x2: 168, y2: 250, warp: 3 },
         ],
         windows: [
           { xRel: 24, yRel: 120, w: 32, h: 44, lit: true, amberTint: 0xf59e0b },
           { xRel: 118, yRel: 125, w: 32, h: 44, lit: true, amberTint: 0xfbbf24 },
           { xRel: 22, yRel: 195, w: 34, h: 42, lit: true, amberTint: 0xd97706 },
           { xRel: 72, yRel: 190, w: 34, h: 42, lit: true, amberTint: 0xf59e0b },
-          { xRel: 122, yRel: 200, w: 32, h: 42, lit: false }
-        ]
+          { xRel: 122, yRel: 200, w: 32, h: 42, lit: false },
+        ],
       },
       {
         name: 'The Crooked Garret',
-        x: 175, w: 135, h: 485, roofHeight: 90, roofType: 'gable', sag: 9, lean: -5,
+        x: 175,
+        w: 135,
+        h: 485,
+        roofHeight: 90,
+        roofType: 'gable',
+        sag: 9,
+        lean: -5,
         chimney: { xRel: 95, w: 16, h: 48, style: 'pipe' },
         timberBeams: [
           { x1: 12, y1: 110, x2: 122, y2: 195, warp: -4 },
           { x1: 122, y1: 110, x2: 12, y2: 195, warp: 5 },
           { x1: 10, y1: 210, x2: 125, y2: 210, warp: 3 },
-          { x1: 15, y1: 300, x2: 120, y2: 300, warp: -2 }
+          { x1: 15, y1: 300, x2: 120, y2: 300, warp: -2 },
         ],
         windows: [
           { xRel: 48, yRel: 115, w: 28, h: 36, arched: true, lit: true, amberTint: 0xfef08a },
           { xRel: 22, yRel: 220, w: 26, h: 38, lit: true, amberTint: 0xf59e0b },
           { xRel: 78, yRel: 225, w: 28, h: 38, lit: false },
-          { xRel: 50, yRel: 315, w: 30, h: 42, lit: true, amberTint: 0xd97706 }
-        ]
+          { xRel: 50, yRel: 315, w: 30, h: 42, lit: true, amberTint: 0xd97706 },
+        ],
       },
       {
         name: 'The Stepped Gable House',
-        x: 305, w: 160, h: 420, roofHeight: 70, roofType: 'gable', sag: 4, lean: 2,
+        x: 305,
+        w: 160,
+        h: 420,
+        roofHeight: 70,
+        roofType: 'gable',
+        sag: 4,
+        lean: 2,
         chimney: { xRel: 25, w: 20, h: 38, style: 'brick' },
         timberBeams: [
           { x1: 15, y1: 160, x2: 145, y2: 160, warp: 3 },
-          { x1: 15, y1: 260, x2: 145, y2: 260, warp: -2 }
+          { x1: 15, y1: 260, x2: 145, y2: 260, warp: -2 },
         ],
         windows: [
           { xRel: 32, yRel: 100, w: 26, h: 36, arched: true, lit: true, amberTint: 0xfbbf24 },
           { xRel: 95, yRel: 100, w: 26, h: 36, arched: true, lit: true, amberTint: 0xf59e0b },
           { xRel: 28, yRel: 180, w: 30, h: 42, lit: true, amberTint: 0xfef08a },
           { xRel: 95, yRel: 182, w: 30, h: 42, lit: false },
-          { xRel: 58, yRel: 275, w: 36, h: 48, lit: true, amberTint: 0xd97706 }
-        ]
+          { xRel: 58, yRel: 275, w: 36, h: 48, lit: true, amberTint: 0xd97706 },
+        ],
       },
       {
         name: 'The Timber Jetty Inn',
-        x: 460, w: 195, h: 465, roofHeight: 85, roofType: 'gable', sag: 8, lean: 4,
+        x: 460,
+        w: 195,
+        h: 465,
+        roofHeight: 85,
+        roofType: 'gable',
+        sag: 8,
+        lean: 4,
         hasLantern: true,
         chimney: { xRel: 145, w: 24, h: 45, style: 'brick' },
         timberBeams: [
           { x1: 10, y1: 110, x2: 185, y2: 220, warp: 5 },
           { x1: 185, y1: 110, x2: 10, y2: 220, warp: -5 },
           { x1: 8, y1: 230, x2: 188, y2: 230, warp: 3 },
-          { x1: 20, y1: 320, x2: 175, y2: 320, warp: -3 }
+          { x1: 20, y1: 320, x2: 175, y2: 320, warp: -3 },
         ],
         windows: [
           { xRel: 30, yRel: 120, w: 30, h: 40, lit: true, amberTint: 0xf59e0b },
           { xRel: 80, yRel: 118, w: 30, h: 40, lit: true, amberTint: 0xfbbf24 },
           { xRel: 130, yRel: 124, w: 30, h: 40, lit: false },
           { xRel: 25, yRel: 240, w: 34, h: 44, lit: true, amberTint: 0xfef08a },
-          { xRel: 128, yRel: 245, w: 34, h: 44, lit: true, amberTint: 0xd97706 }
-        ]
+          { xRel: 128, yRel: 245, w: 34, h: 44, lit: true, amberTint: 0xd97706 },
+        ],
       },
       {
         name: 'The Clock / Belfry Tower',
-        x: 650, w: 115, h: 540, roofHeight: 110, roofType: 'spire', sag: 3, lean: -2,
+        x: 650,
+        w: 115,
+        h: 540,
+        roofHeight: 110,
+        roofType: 'spire',
+        sag: 3,
+        lean: -2,
         chimney: { xRel: 10, w: 12, h: 25, style: 'pipe' },
         timberBeams: [
           { x1: 10, y1: 160, x2: 105, y2: 160, warp: 2 },
-          { x1: 10, y1: 280, x2: 105, y2: 280, warp: -2 }
+          { x1: 10, y1: 280, x2: 105, y2: 280, warp: -2 },
         ],
         windows: [
           { xRel: 38, yRel: 125, w: 38, h: 38, arched: true, lit: true, amberTint: 0xfef08a },
           { xRel: 25, yRel: 200, w: 24, h: 48, arched: true, lit: false },
           { xRel: 65, yRel: 200, w: 24, h: 48, arched: true, lit: false },
-          { xRel: 42, yRel: 310, w: 28, h: 40, lit: true, amberTint: 0xf59e0b }
-        ]
+          { xRel: 42, yRel: 310, w: 28, h: 40, lit: true, amberTint: 0xf59e0b },
+        ],
       },
       {
         name: 'The Mansard Atelier',
-        x: 760, w: 175, h: 435, roofHeight: 75, roofType: 'mansard', sag: 5, lean: 3,
+        x: 760,
+        w: 175,
+        h: 435,
+        roofHeight: 75,
+        roofType: 'mansard',
+        sag: 5,
+        lean: 3,
         chimney: { xRel: 130, w: 18, h: 40, style: 'pot' },
         timberBeams: [
           { x1: 15, y1: 145, x2: 160, y2: 145, warp: 3 },
-          { x1: 15, y1: 245, x2: 160, y2: 245, warp: -3 }
+          { x1: 15, y1: 245, x2: 160, y2: 245, warp: -3 },
         ],
         windows: [
           { xRel: 65, yRel: 95, w: 42, h: 34, lit: true, amberTint: 0xfef08a },
           { xRel: 25, yRel: 165, w: 32, h: 44, lit: true, amberTint: 0xfbbf24 },
           { xRel: 115, yRel: 168, w: 32, h: 44, lit: true, amberTint: 0xf59e0b },
-          { xRel: 70, yRel: 260, w: 36, h: 46, lit: false }
-        ]
+          { xRel: 70, yRel: 260, w: 36, h: 46, lit: false },
+        ],
       },
       {
         name: 'The Bohemian Tenement',
-        x: 930, w: 165, h: 475, roofHeight: 80, roofType: 'gable', sag: 7, lean: -4,
+        x: 930,
+        w: 165,
+        h: 475,
+        roofHeight: 80,
+        roofType: 'gable',
+        sag: 7,
+        lean: -4,
         chimney: { xRel: 30, w: 24, h: 44, style: 'pot' },
         timberBeams: [
           { x1: 12, y1: 130, x2: 152, y2: 215, warp: -4 },
           { x1: 152, y1: 130, x2: 12, y2: 215, warp: 4 },
           { x1: 10, y1: 230, x2: 155, y2: 230, warp: 2 },
-          { x1: 12, y1: 330, x2: 152, y2: 330, warp: -2 }
+          { x1: 12, y1: 330, x2: 152, y2: 330, warp: -2 },
         ],
         windows: [
           { xRel: 24, yRel: 140, w: 26, h: 36, lit: true, amberTint: 0xd97706 },
@@ -415,142 +478,198 @@ export class BootScene extends Phaser.Scene {
           { xRel: 112, yRel: 142, w: 26, h: 36, lit: false },
           { xRel: 26, yRel: 240, w: 28, h: 38, lit: false },
           { xRel: 70, yRel: 244, w: 28, h: 38, lit: true, amberTint: 0xfbbf24 },
-          { xRel: 114, yRel: 238, w: 28, h: 38, lit: true, amberTint: 0xf59e0b }
-        ]
+          { xRel: 114, yRel: 238, w: 28, h: 38, lit: true, amberTint: 0xf59e0b },
+        ],
       },
       {
         name: 'The Leaning Gable Workshop',
-        x: 1090, w: 145, h: 445, roofHeight: 85, roofType: 'gable', sag: 9, lean: -6,
+        x: 1090,
+        w: 145,
+        h: 445,
+        roofHeight: 85,
+        roofType: 'gable',
+        sag: 9,
+        lean: -6,
         hasLantern: true,
         chimney: { xRel: 100, w: 16, h: 36, style: 'pipe' },
         timberBeams: [
           { x1: 10, y1: 125, x2: 135, y2: 125, warp: 3 },
-          { x1: 12, y1: 220, x2: 132, y2: 310, warp: -4 }
+          { x1: 12, y1: 220, x2: 132, y2: 310, warp: -4 },
         ],
         windows: [
           { xRel: 52, yRel: 135, w: 34, h: 42, lit: true, amberTint: 0xfef08a },
           { xRel: 22, yRel: 230, w: 28, h: 38, lit: true, amberTint: 0xf59e0b },
-          { xRel: 88, yRel: 235, w: 28, h: 38, lit: false }
-        ]
+          { xRel: 88, yRel: 235, w: 28, h: 38, lit: false },
+        ],
       },
       {
         name: 'The Archway House',
-        x: 1230, w: 185, h: 450, roofHeight: 75, roofType: 'gable', sag: 6, lean: 2,
-        hasSign: true, signText: 'VINS',
+        x: 1230,
+        w: 185,
+        h: 450,
+        roofHeight: 75,
+        roofType: 'gable',
+        sag: 6,
+        lean: 2,
+        hasSign: true,
+        signText: 'VINS',
         chimney: { xRel: 135, w: 22, h: 40, style: 'brick' },
         timberBeams: [
           { x1: 15, y1: 140, x2: 170, y2: 140, warp: 3 },
-          { x1: 15, y1: 240, x2: 170, y2: 240, warp: -2 }
+          { x1: 15, y1: 240, x2: 170, y2: 240, warp: -2 },
         ],
         windows: [
           { xRel: 30, yRel: 150, w: 32, h: 42, lit: true, amberTint: 0xfbbf24 },
           { xRel: 78, yRel: 146, w: 32, h: 42, lit: true, amberTint: 0xfef08a },
-          { xRel: 124, yRel: 152, w: 32, h: 42, lit: true, amberTint: 0xd97706 }
-        ]
+          { xRel: 124, yRel: 152, w: 32, h: 42, lit: true, amberTint: 0xd97706 },
+        ],
       },
       {
         name: 'The Apothecary',
-        x: 1410, w: 140, h: 465, roofHeight: 85, roofType: 'gable', sag: 7, lean: 3,
+        x: 1410,
+        w: 140,
+        h: 465,
+        roofHeight: 85,
+        roofType: 'gable',
+        sag: 7,
+        lean: 3,
         chimney: { xRel: 25, w: 20, h: 46, style: 'brick' },
         timberBeams: [
           { x1: 12, y1: 120, x2: 128, y2: 205, warp: 4 },
           { x1: 128, y1: 120, x2: 12, y2: 205, warp: -4 },
-          { x1: 10, y1: 220, x2: 130, y2: 220, warp: 2 }
+          { x1: 10, y1: 220, x2: 130, y2: 220, warp: 2 },
         ],
         windows: [
           { xRel: 48, yRel: 110, w: 32, h: 38, arched: true, lit: true, amberTint: 0x10b981 },
           { xRel: 24, yRel: 235, w: 28, h: 40, lit: true, amberTint: 0xf59e0b },
-          { xRel: 82, yRel: 238, w: 28, h: 40, lit: true, amberTint: 0xfbbf24 }
-        ]
+          { xRel: 82, yRel: 238, w: 28, h: 40, lit: true, amberTint: 0xfbbf24 },
+        ],
       },
       {
         name: 'The Weathered Granary',
-        x: 1545, w: 175, h: 395, roofHeight: 65, roofType: 'shed', sag: 8, lean: -3,
+        x: 1545,
+        w: 175,
+        h: 395,
+        roofHeight: 65,
+        roofType: 'shed',
+        sag: 8,
+        lean: -3,
         chimney: { xRel: 120, w: 16, h: 32, style: 'pipe' },
         timberBeams: [
           { x1: 15, y1: 110, x2: 160, y2: 110, warp: 4 },
           { x1: 15, y1: 200, x2: 160, y2: 200, warp: -3 },
-          { x1: 20, y1: 115, x2: 155, y2: 280, warp: 3 }
+          { x1: 20, y1: 115, x2: 155, y2: 280, warp: 3 },
         ],
         windows: [
           { xRel: 35, yRel: 125, w: 30, h: 34, lit: false },
-          { xRel: 105, yRel: 130, w: 30, h: 34, lit: true, amberTint: 0xd97706 }
-        ]
+          { xRel: 105, yRel: 130, w: 30, h: 34, lit: true, amberTint: 0xd97706 },
+        ],
       },
       {
         name: 'The Conical Turret Villa',
-        x: 1715, w: 160, h: 480, roofHeight: 95, roofType: 'spire', sag: 5, lean: 2,
+        x: 1715,
+        w: 160,
+        h: 480,
+        roofHeight: 95,
+        roofType: 'spire',
+        sag: 5,
+        lean: 2,
         hasLantern: true,
         chimney: { xRel: 25, w: 18, h: 42, style: 'pot' },
         timberBeams: [
           { x1: 12, y1: 150, x2: 148, y2: 150, warp: 2 },
-          { x1: 12, y1: 250, x2: 148, y2: 250, warp: -3 }
+          { x1: 12, y1: 250, x2: 148, y2: 250, warp: -3 },
         ],
         windows: [
           { xRel: 35, yRel: 165, w: 28, h: 40, arched: true, lit: true, amberTint: 0xfef08a },
           { xRel: 95, yRel: 165, w: 28, h: 40, arched: true, lit: true, amberTint: 0xf59e0b },
           { xRel: 40, yRel: 270, w: 30, h: 42, lit: false },
-          { xRel: 98, yRel: 272, w: 30, h: 42, lit: true, amberTint: 0xfbbf24 }
-        ]
+          { xRel: 98, yRel: 272, w: 30, h: 42, lit: true, amberTint: 0xfbbf24 },
+        ],
       },
       {
         name: 'The Twin Gable Duplex',
-        x: 1870, w: 185, h: 455, roofHeight: 80, roofType: 'gable', sag: 7, lean: -2,
+        x: 1870,
+        w: 185,
+        h: 455,
+        roofHeight: 80,
+        roofType: 'gable',
+        sag: 7,
+        lean: -2,
         chimney: { xRel: 85, w: 22, h: 46, style: 'brick' },
         timberBeams: [
           { x1: 15, y1: 135, x2: 170, y2: 135, warp: 3 },
-          { x1: 15, y1: 235, x2: 170, y2: 235, warp: -2 }
+          { x1: 15, y1: 235, x2: 170, y2: 235, warp: -2 },
         ],
         windows: [
           { xRel: 25, yRel: 145, w: 26, h: 36, lit: true, amberTint: 0xf59e0b },
           { xRel: 60, yRel: 145, w: 26, h: 36, lit: false },
           { xRel: 105, yRel: 142, w: 26, h: 36, lit: true, amberTint: 0xfbbf24 },
-          { xRel: 140, yRel: 142, w: 26, h: 36, lit: true, amberTint: 0xd97706 }
-        ]
+          { xRel: 140, yRel: 142, w: 26, h: 36, lit: true, amberTint: 0xd97706 },
+        ],
       },
       {
-        name: 'The Bookbinder\'s Shanty',
-        x: 2050, w: 140, h: 430, roofHeight: 70, roofType: 'shed', sag: 8, lean: 5,
+        name: "The Bookbinder's Shanty",
+        x: 2050,
+        w: 140,
+        h: 430,
+        roofHeight: 70,
+        roofType: 'shed',
+        sag: 8,
+        lean: 5,
         chimney: { xRel: 95, w: 14, h: 36, style: 'pipe' },
         timberBeams: [
           { x1: 10, y1: 120, x2: 125, y2: 210, warp: -3 },
-          { x1: 125, y1: 120, x2: 10, y2: 210, warp: 4 }
+          { x1: 125, y1: 120, x2: 10, y2: 210, warp: 4 },
         ],
         windows: [
           { xRel: 42, yRel: 130, w: 32, h: 38, lit: true, amberTint: 0xfef08a },
-          { xRel: 35, yRel: 235, w: 30, h: 40, lit: true, amberTint: 0xf59e0b }
-        ]
+          { xRel: 35, yRel: 235, w: 30, h: 40, lit: true, amberTint: 0xf59e0b },
+        ],
       },
       {
         name: 'The Old Bell Gable Cottage',
-        x: 2185, w: 170, h: 440, roofHeight: 75, roofType: 'bell', sag: 6, lean: -2,
-        hasSign: true, signText: 'CAFE',
+        x: 2185,
+        w: 170,
+        h: 440,
+        roofHeight: 75,
+        roofType: 'bell',
+        sag: 6,
+        lean: -2,
+        hasSign: true,
+        signText: 'CAFE',
         chimney: { xRel: 25, w: 20, h: 40, style: 'pot' },
         timberBeams: [
           { x1: 15, y1: 145, x2: 155, y2: 145, warp: 3 },
-          { x1: 15, y1: 245, x2: 155, y2: 245, warp: -2 }
+          { x1: 15, y1: 245, x2: 155, y2: 245, warp: -2 },
         ],
         windows: [
           { xRel: 72, yRel: 100, w: 26, h: 26, arched: true, lit: true, amberTint: 0xfef08a },
           { xRel: 28, yRel: 165, w: 32, h: 42, lit: true, amberTint: 0xfbbf24 },
-          { xRel: 110, yRel: 168, w: 32, h: 42, lit: true, amberTint: 0xf59e0b }
-        ]
+          { xRel: 110, yRel: 168, w: 32, h: 42, lit: true, amberTint: 0xf59e0b },
+        ],
       },
       {
         name: 'The Riverside Watchpost',
-        x: 2350, w: 215, h: 490, roofHeight: 90, roofType: 'spire', sag: 4, lean: 2,
+        x: 2350,
+        w: 215,
+        h: 490,
+        roofHeight: 90,
+        roofType: 'spire',
+        sag: 4,
+        lean: 2,
         hasLantern: true,
         chimney: { xRel: 170, w: 22, h: 42, style: 'brick' },
         timberBeams: [
           { x1: 15, y1: 150, x2: 195, y2: 150, warp: 3 },
-          { x1: 15, y1: 260, x2: 195, y2: 260, warp: -3 }
+          { x1: 15, y1: 260, x2: 195, y2: 260, warp: -3 },
         ],
         windows: [
           { xRel: 40, yRel: 165, w: 30, h: 42, arched: true, lit: true, amberTint: 0xf59e0b },
           { xRel: 135, yRel: 165, w: 30, h: 42, arched: true, lit: true, amberTint: 0xfef08a },
-          { xRel: 88, yRel: 275, w: 34, h: 46, lit: true, amberTint: 0xd97706 }
-        ]
-      }
+          { xRel: 88, yRel: 275, w: 34, h: 46, lit: true, amberTint: 0xd97706 },
+        ],
+      },
     ];
 
     for (const mb of midBuildings) {
@@ -571,22 +690,98 @@ export class BootScene extends Phaser.Scene {
         drawQuad(midGfx, leftEaveX, eaveY, leftEaveX + 15, midPitchY + mb.sag, mb.x + mb.w * 0.25, midPitchY);
         drawQuad(midGfx, mb.x + mb.w * 0.25, midPitchY, peakX - 15, roofPeakY + mb.sag, peakX, roofPeakY);
         drawQuad(midGfx, peakX, roofPeakY, peakX + 15, roofPeakY + mb.sag, mb.x + mb.w * 0.75, midPitchY);
-        drawQuad(midGfx, mb.x + mb.w * 0.75, midPitchY, rightEaveX - 15, midPitchY + mb.sag, rightEaveX, eaveY);
+        drawQuad(
+          midGfx,
+          mb.x + mb.w * 0.75,
+          midPitchY,
+          rightEaveX - 15,
+          midPitchY + mb.sag,
+          rightEaveX,
+          eaveY,
+        );
       } else if (mb.roofType === 'mansard') {
-        drawCubic(midGfx, leftEaveX, eaveY, leftEaveX + 8, eaveY - mb.roofHeight * 0.7, mb.x + mb.w * 0.2, roofPeakY + 4, peakX - 25, roofPeakY);
+        drawCubic(
+          midGfx,
+          leftEaveX,
+          eaveY,
+          leftEaveX + 8,
+          eaveY - mb.roofHeight * 0.7,
+          mb.x + mb.w * 0.2,
+          roofPeakY + 4,
+          peakX - 25,
+          roofPeakY,
+        );
         midGfx.lineTo(peakX + 25, roofPeakY);
-        drawCubic(midGfx, peakX + 25, roofPeakY, mb.x + mb.w * 0.8, roofPeakY + 4, rightEaveX - 8, eaveY - mb.roofHeight * 0.7, rightEaveX, eaveY);
+        drawCubic(
+          midGfx,
+          peakX + 25,
+          roofPeakY,
+          mb.x + mb.w * 0.8,
+          roofPeakY + 4,
+          rightEaveX - 8,
+          eaveY - mb.roofHeight * 0.7,
+          rightEaveX,
+          eaveY,
+        );
       } else if (mb.roofType === 'bell') {
-        drawQuad(midGfx, leftEaveX, eaveY, leftEaveX + 20, eaveY - 20, leftEaveX + 25, eaveY - mb.roofHeight * 0.5);
-        drawQuad(midGfx, leftEaveX + 25, eaveY - mb.roofHeight * 0.5, leftEaveX + 28, roofPeakY + 10, peakX, roofPeakY);
-        drawQuad(midGfx, peakX, roofPeakY, rightEaveX - 28, roofPeakY + 10, rightEaveX - 25, eaveY - mb.roofHeight * 0.5);
-        drawQuad(midGfx, rightEaveX - 25, eaveY - mb.roofHeight * 0.5, rightEaveX - 20, eaveY - 20, rightEaveX, eaveY);
+        drawQuad(
+          midGfx,
+          leftEaveX,
+          eaveY,
+          leftEaveX + 20,
+          eaveY - 20,
+          leftEaveX + 25,
+          eaveY - mb.roofHeight * 0.5,
+        );
+        drawQuad(
+          midGfx,
+          leftEaveX + 25,
+          eaveY - mb.roofHeight * 0.5,
+          leftEaveX + 28,
+          roofPeakY + 10,
+          peakX,
+          roofPeakY,
+        );
+        drawQuad(
+          midGfx,
+          peakX,
+          roofPeakY,
+          rightEaveX - 28,
+          roofPeakY + 10,
+          rightEaveX - 25,
+          eaveY - mb.roofHeight * 0.5,
+        );
+        drawQuad(
+          midGfx,
+          rightEaveX - 25,
+          eaveY - mb.roofHeight * 0.5,
+          rightEaveX - 20,
+          eaveY - 20,
+          rightEaveX,
+          eaveY,
+        );
       } else if (mb.roofType === 'shed') {
         drawQuad(midGfx, leftEaveX, eaveY, mb.x + mb.w * 0.5, roofPeakY + mb.sag, rightEaveX, roofPeakY);
         midGfx.lineTo(rightEaveX, eaveY);
       } else {
-        drawQuad(midGfx, leftEaveX, eaveY, (leftEaveX + peakX) / 2 - 4, (eaveY + roofPeakY) / 2 + mb.sag, peakX, roofPeakY);
-        drawQuad(midGfx, peakX, roofPeakY, (peakX + rightEaveX) / 2 + 4, (roofPeakY + eaveY) / 2 + mb.sag, rightEaveX, eaveY);
+        drawQuad(
+          midGfx,
+          leftEaveX,
+          eaveY,
+          (leftEaveX + peakX) / 2 - 4,
+          (eaveY + roofPeakY) / 2 + mb.sag,
+          peakX,
+          roofPeakY,
+        );
+        drawQuad(
+          midGfx,
+          peakX,
+          roofPeakY,
+          (peakX + rightEaveX) / 2 + 4,
+          (roofPeakY + eaveY) / 2 + mb.sag,
+          rightEaveX,
+          eaveY,
+        );
       }
 
       midGfx.lineTo(mb.x + mb.w, 720);
@@ -604,21 +799,97 @@ export class BootScene extends Phaser.Scene {
         drawQuad(midGfx, leftEaveX, eaveY, leftEaveX + 15, midPitchY + mb.sag, mb.x + mb.w * 0.25, midPitchY);
         drawQuad(midGfx, mb.x + mb.w * 0.25, midPitchY, peakX - 15, roofPeakY + mb.sag, peakX, roofPeakY);
         drawQuad(midGfx, peakX, roofPeakY, peakX + 15, roofPeakY + mb.sag, mb.x + mb.w * 0.75, midPitchY);
-        drawQuad(midGfx, mb.x + mb.w * 0.75, midPitchY, rightEaveX - 15, midPitchY + mb.sag, rightEaveX, eaveY);
+        drawQuad(
+          midGfx,
+          mb.x + mb.w * 0.75,
+          midPitchY,
+          rightEaveX - 15,
+          midPitchY + mb.sag,
+          rightEaveX,
+          eaveY,
+        );
       } else if (mb.roofType === 'mansard') {
-        drawCubic(midGfx, leftEaveX, eaveY, leftEaveX + 8, eaveY - mb.roofHeight * 0.7, mb.x + mb.w * 0.2, roofPeakY + 4, peakX - 25, roofPeakY);
+        drawCubic(
+          midGfx,
+          leftEaveX,
+          eaveY,
+          leftEaveX + 8,
+          eaveY - mb.roofHeight * 0.7,
+          mb.x + mb.w * 0.2,
+          roofPeakY + 4,
+          peakX - 25,
+          roofPeakY,
+        );
         midGfx.lineTo(peakX + 25, roofPeakY);
-        drawCubic(midGfx, peakX + 25, roofPeakY, mb.x + mb.w * 0.8, roofPeakY + 4, rightEaveX - 8, eaveY - mb.roofHeight * 0.7, rightEaveX, eaveY);
+        drawCubic(
+          midGfx,
+          peakX + 25,
+          roofPeakY,
+          mb.x + mb.w * 0.8,
+          roofPeakY + 4,
+          rightEaveX - 8,
+          eaveY - mb.roofHeight * 0.7,
+          rightEaveX,
+          eaveY,
+        );
       } else if (mb.roofType === 'bell') {
-        drawQuad(midGfx, leftEaveX, eaveY, leftEaveX + 20, eaveY - 20, leftEaveX + 25, eaveY - mb.roofHeight * 0.5);
-        drawQuad(midGfx, leftEaveX + 25, eaveY - mb.roofHeight * 0.5, leftEaveX + 28, roofPeakY + 10, peakX, roofPeakY);
-        drawQuad(midGfx, peakX, roofPeakY, rightEaveX - 28, roofPeakY + 10, rightEaveX - 25, eaveY - mb.roofHeight * 0.5);
-        drawQuad(midGfx, rightEaveX - 25, eaveY - mb.roofHeight * 0.5, rightEaveX - 20, eaveY - 20, rightEaveX, eaveY);
+        drawQuad(
+          midGfx,
+          leftEaveX,
+          eaveY,
+          leftEaveX + 20,
+          eaveY - 20,
+          leftEaveX + 25,
+          eaveY - mb.roofHeight * 0.5,
+        );
+        drawQuad(
+          midGfx,
+          leftEaveX + 25,
+          eaveY - mb.roofHeight * 0.5,
+          leftEaveX + 28,
+          roofPeakY + 10,
+          peakX,
+          roofPeakY,
+        );
+        drawQuad(
+          midGfx,
+          peakX,
+          roofPeakY,
+          rightEaveX - 28,
+          roofPeakY + 10,
+          rightEaveX - 25,
+          eaveY - mb.roofHeight * 0.5,
+        );
+        drawQuad(
+          midGfx,
+          rightEaveX - 25,
+          eaveY - mb.roofHeight * 0.5,
+          rightEaveX - 20,
+          eaveY - 20,
+          rightEaveX,
+          eaveY,
+        );
       } else if (mb.roofType === 'shed') {
         drawQuad(midGfx, leftEaveX, eaveY, mb.x + mb.w * 0.5, roofPeakY + mb.sag, rightEaveX, roofPeakY);
       } else {
-        drawQuad(midGfx, leftEaveX, eaveY, (leftEaveX + peakX) / 2 - 4, (eaveY + roofPeakY) / 2 + mb.sag, peakX, roofPeakY);
-        drawQuad(midGfx, peakX, roofPeakY, (peakX + rightEaveX) / 2 + 4, (roofPeakY + eaveY) / 2 + mb.sag, rightEaveX, eaveY);
+        drawQuad(
+          midGfx,
+          leftEaveX,
+          eaveY,
+          (leftEaveX + peakX) / 2 - 4,
+          (eaveY + roofPeakY) / 2 + mb.sag,
+          peakX,
+          roofPeakY,
+        );
+        drawQuad(
+          midGfx,
+          peakX,
+          roofPeakY,
+          (peakX + rightEaveX) / 2 + 4,
+          (roofPeakY + eaveY) / 2 + mb.sag,
+          rightEaveX,
+          eaveY,
+        );
       }
       midGfx.strokePath();
 
@@ -765,85 +1036,135 @@ export class BootScene extends Phaser.Scene {
 
     const canalStructures: CanalStructure[] = [
       {
-        type: 'palazzo', x: 0, w: 185, h: 465, roofType: 'venetian_gable',
+        type: 'palazzo',
+        x: 0,
+        w: 185,
+        h: 465,
+        roofType: 'venetian_gable',
         windows: [
           { xRel: 28, yRel: 130, w: 26, h: 48, trefoil: true, lit: true },
           { xRel: 72, yRel: 130, w: 26, h: 48, trefoil: true, lit: true },
           { xRel: 118, yRel: 130, w: 26, h: 48, trefoil: true, lit: false },
           { xRel: 45, yRel: 240, w: 32, h: 44, trefoil: false, lit: true },
-          { xRel: 105, yRel: 240, w: 32, h: 44, trefoil: false, lit: false }
-        ]
+          { xRel: 105, yRel: 240, w: 32, h: 44, trefoil: false, lit: false },
+        ],
       },
       {
-        type: 'bridge', x: 180, w: 175, h: 360,
-        bridgeArch: { archW: 110, archH: 65 }
+        type: 'bridge',
+        x: 180,
+        w: 175,
+        h: 360,
+        bridgeArch: { archW: 110, archH: 65 },
       },
       {
-        type: 'dock', x: 350, w: 190, h: 430,
-        dockPosts: [30, 85, 145]
+        type: 'dock',
+        x: 350,
+        w: 190,
+        h: 430,
+        dockPosts: [30, 85, 145],
       },
       {
-        type: 'tower', x: 535, w: 155, h: 520, roofType: 'campanile'
+        type: 'tower',
+        x: 535,
+        w: 155,
+        h: 520,
+        roofType: 'campanile',
       },
       {
-        type: 'palazzo', x: 685, w: 195, h: 445, roofType: 'terrace',
+        type: 'palazzo',
+        x: 685,
+        w: 195,
+        h: 445,
+        roofType: 'terrace',
         windows: [
           { xRel: 30, yRel: 140, w: 24, h: 42, trefoil: true, lit: false },
           { xRel: 75, yRel: 140, w: 24, h: 42, trefoil: true, lit: true },
-          { xRel: 125, yRel: 140, w: 24, h: 42, trefoil: true, lit: true }
-        ]
+          { xRel: 125, yRel: 140, w: 24, h: 42, trefoil: true, lit: true },
+        ],
       },
       {
-        type: 'bridge', x: 875, w: 170, h: 370,
-        bridgeArch: { archW: 105, archH: 70 }
+        type: 'bridge',
+        x: 875,
+        w: 170,
+        h: 370,
+        bridgeArch: { archW: 105, archH: 70 },
       },
       {
-        type: 'palazzo', x: 1040, w: 195, h: 480, roofType: 'venetian_gable',
+        type: 'palazzo',
+        x: 1040,
+        w: 195,
+        h: 480,
+        roofType: 'venetian_gable',
         windows: [
           { xRel: 35, yRel: 120, w: 28, h: 48, trefoil: true, lit: true },
           { xRel: 80, yRel: 120, w: 28, h: 48, trefoil: true, lit: true },
-          { xRel: 125, yRel: 120, w: 28, h: 48, trefoil: true, lit: false }
-        ]
+          { xRel: 125, yRel: 120, w: 28, h: 48, trefoil: true, lit: false },
+        ],
       },
       {
-        type: 'dock', x: 1230, w: 175, h: 425,
-        dockPosts: [25, 75, 135]
+        type: 'dock',
+        x: 1230,
+        w: 175,
+        h: 425,
+        dockPosts: [25, 75, 135],
       },
       {
-        type: 'tower', x: 1400, w: 160, h: 530, roofType: 'campanile'
+        type: 'tower',
+        x: 1400,
+        w: 160,
+        h: 530,
+        roofType: 'campanile',
       },
       {
-        type: 'bridge', x: 1555, w: 180, h: 365,
-        bridgeArch: { archW: 115, archH: 60 }
+        type: 'bridge',
+        x: 1555,
+        w: 180,
+        h: 365,
+        bridgeArch: { archW: 115, archH: 60 },
       },
       {
-        type: 'palazzo', x: 1730, w: 190, h: 450, roofType: 'terrace',
+        type: 'palazzo',
+        x: 1730,
+        w: 190,
+        h: 450,
+        roofType: 'terrace',
         windows: [
           { xRel: 32, yRel: 135, w: 26, h: 44, trefoil: true, lit: true },
           { xRel: 82, yRel: 135, w: 26, h: 44, trefoil: true, lit: false },
-          { xRel: 132, yRel: 135, w: 26, h: 44, trefoil: true, lit: true }
-        ]
+          { xRel: 132, yRel: 135, w: 26, h: 44, trefoil: true, lit: true },
+        ],
       },
       {
-        type: 'palazzo', x: 1915, w: 170, h: 475, roofType: 'venetian_gable',
+        type: 'palazzo',
+        x: 1915,
+        w: 170,
+        h: 475,
+        roofType: 'venetian_gable',
         windows: [
           { xRel: 30, yRel: 145, w: 30, h: 46, trefoil: true, lit: true },
-          { xRel: 95, yRel: 145, w: 30, h: 46, trefoil: true, lit: false }
-        ]
+          { xRel: 95, yRel: 145, w: 30, h: 46, trefoil: true, lit: false },
+        ],
       },
       {
-        type: 'dock', x: 2080, w: 180, h: 430,
-        dockPosts: [35, 90, 145]
+        type: 'dock',
+        x: 2080,
+        w: 180,
+        h: 430,
+        dockPosts: [35, 90, 145],
       },
       {
-        type: 'palazzo', x: 2255, w: 310, h: 465, roofType: 'terrace',
+        type: 'palazzo',
+        x: 2255,
+        w: 310,
+        h: 465,
+        roofType: 'terrace',
         windows: [
           { xRel: 40, yRel: 130, w: 28, h: 48, trefoil: true, lit: true },
           { xRel: 95, yRel: 130, w: 28, h: 48, trefoil: true, lit: true },
           { xRel: 150, yRel: 130, w: 28, h: 48, trefoil: true, lit: false },
-          { xRel: 215, yRel: 130, w: 28, h: 48, trefoil: true, lit: true }
-        ]
-      }
+          { xRel: 215, yRel: 130, w: 28, h: 48, trefoil: true, lit: true },
+        ],
+      },
     ];
 
     for (const cs of canalStructures) {
@@ -891,7 +1212,6 @@ export class BootScene extends Phaser.Scene {
         // Keystone block at apex of bridge arch
         midGfx.fillStyle(0x3e5f50, 1);
         midGfx.fillRect(cs.x + cs.w / 2 - 8, archCenterY - 6, 16, 14);
-
       } else if (cs.type === 'dock') {
         // Flat dock warehouse with timber decking
         midGfx.beginPath();
@@ -918,9 +1238,12 @@ export class BootScene extends Phaser.Scene {
             // Spiral rope binding
             midGfx.lineStyle(1.5, 0xd97706, 0.85);
             midGfx.beginPath();
-            midGfx.moveTo(px - 1, 528); midGfx.lineTo(px + 9, 532);
-            midGfx.moveTo(px - 1, 538); midGfx.lineTo(px + 9, 542);
-            midGfx.moveTo(px - 1, 548); midGfx.lineTo(px + 9, 552);
+            midGfx.moveTo(px - 1, 528);
+            midGfx.lineTo(px + 9, 532);
+            midGfx.moveTo(px - 1, 538);
+            midGfx.lineTo(px + 9, 542);
+            midGfx.moveTo(px - 1, 548);
+            midGfx.lineTo(px + 9, 552);
             midGfx.strokePath();
           }
         }
@@ -929,7 +1252,6 @@ export class BootScene extends Phaser.Scene {
         midGfx.fillStyle(0x0a1410, 1);
         midGfx.fillRect(cs.x + 35, 470, cs.w - 70, 95);
         midGfx.fillCircle(cs.x + cs.w / 2, 470, (cs.w - 70) / 2);
-
       } else if (cs.type === 'tower') {
         // Tall Venetian Campanile (Bell Tower)
         midGfx.fillRect(cs.x, topY, cs.w, cs.h);
@@ -951,7 +1273,6 @@ export class BootScene extends Phaser.Scene {
         // Hanging bronze bell silhouette
         midGfx.fillStyle(0xd97706, 0.8);
         midGfx.fillCircle(cs.x + cs.w / 2, topY + 45, 10);
-
       } else {
         // Palazzo facade with Venetian pointed / trefoil windows
         midGfx.beginPath();
@@ -1031,81 +1352,138 @@ export class BootScene extends Phaser.Scene {
 
     const marketBuildings: MarketBuilding[] = [
       {
-        x: 0, w: 180, h: 450, roofPeak: 70,
+        x: 0,
+        w: 180,
+        h: 450,
+        roofPeak: 70,
         awning: { yRel: 340, w: 165, h: 45, stripe1: 0xb91c1c, stripe2: 0xf59e0b, sag: 18 },
         stallShelves: true,
-        lanterns: [{ xRel: 25, yRel: 330, color: 0xf59e0b }, { xRel: 145, yRel: 330, color: 0xf97316 }]
+        lanterns: [
+          { xRel: 25, yRel: 330, color: 0xf59e0b },
+          { xRel: 145, yRel: 330, color: 0xf97316 },
+        ],
       },
       {
-        x: 175, w: 160, h: 420, roofPeak: 65,
+        x: 175,
+        w: 160,
+        h: 420,
+        roofPeak: 65,
         awning: { yRel: 320, w: 150, h: 42, stripe1: 0xc2410c, stripe2: 0xfef08a, sag: 16 },
         stallShelves: true,
-        lanterns: [{ xRel: 80, yRel: 310, color: 0xfbbf24 }]
+        lanterns: [{ xRel: 80, yRel: 310, color: 0xfbbf24 }],
       },
       {
-        x: 330, w: 195, h: 490, roofPeak: 95,
+        x: 330,
+        w: 195,
+        h: 490,
+        roofPeak: 95,
         awning: { yRel: 360, w: 180, h: 48, stripe1: 0x991b1b, stripe2: 0xf59e0b, sag: 20 },
         stallShelves: true,
-        lanterns: [{ xRel: 35, yRel: 350, color: 0xf59e0b }, { xRel: 155, yRel: 350, color: 0xfbbf24 }]
+        lanterns: [
+          { xRel: 35, yRel: 350, color: 0xf59e0b },
+          { xRel: 155, yRel: 350, color: 0xfbbf24 },
+        ],
       },
       {
-        x: 520, w: 155, h: 410, roofPeak: 60,
+        x: 520,
+        w: 155,
+        h: 410,
+        roofPeak: 60,
         awning: { yRel: 300, w: 145, h: 40, stripe1: 0xb45309, stripe2: 0xfef3c7, sag: 15 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 670, w: 185, h: 520, roofPeak: 110,
+        x: 670,
+        w: 185,
+        h: 520,
+        roofPeak: 110,
         awning: { yRel: 380, w: 170, h: 46, stripe1: 0x7f1d1d, stripe2: 0xfbbf24, sag: 18 },
-        lanterns: [{ xRel: 90, yRel: 360, color: 0xf59e0b }]
+        lanterns: [{ xRel: 90, yRel: 360, color: 0xf59e0b }],
       },
       {
-        x: 850, w: 170, h: 440, roofPeak: 75,
+        x: 850,
+        w: 170,
+        h: 440,
+        roofPeak: 75,
         awning: { yRel: 330, w: 155, h: 44, stripe1: 0xb91c1c, stripe2: 0xfef08a, sag: 17 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 1015, w: 190, h: 465, roofPeak: 80,
+        x: 1015,
+        w: 190,
+        h: 465,
+        roofPeak: 80,
         awning: { yRel: 350, w: 175, h: 48, stripe1: 0xc2410c, stripe2: 0xf59e0b, sag: 19 },
         stallShelves: true,
-        lanterns: [{ xRel: 30, yRel: 340, color: 0xf97316 }, { xRel: 160, yRel: 340, color: 0xfbbf24 }]
+        lanterns: [
+          { xRel: 30, yRel: 340, color: 0xf97316 },
+          { xRel: 160, yRel: 340, color: 0xfbbf24 },
+        ],
       },
       {
-        x: 1200, w: 160, h: 405, roofPeak: 60,
+        x: 1200,
+        w: 160,
+        h: 405,
+        roofPeak: 60,
         awning: { yRel: 305, w: 145, h: 40, stripe1: 0x991b1b, stripe2: 0xfef3c7, sag: 16 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 1355, w: 180, h: 480, roofPeak: 85,
+        x: 1355,
+        w: 180,
+        h: 480,
+        roofPeak: 85,
         awning: { yRel: 360, w: 165, h: 45, stripe1: 0xb45309, stripe2: 0xf59e0b, sag: 18 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 1530, w: 165, h: 430, roofPeak: 70,
+        x: 1530,
+        w: 165,
+        h: 430,
+        roofPeak: 70,
         awning: { yRel: 325, w: 150, h: 42, stripe1: 0xb91c1c, stripe2: 0xfef08a, sag: 17 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 1690, w: 190, h: 510, roofPeak: 100,
+        x: 1690,
+        w: 190,
+        h: 510,
+        roofPeak: 100,
         awning: { yRel: 375, w: 175, h: 48, stripe1: 0x7f1d1d, stripe2: 0xf59e0b, sag: 20 },
         stallShelves: true,
-        lanterns: [{ xRel: 40, yRel: 360, color: 0xfbbf24 }, { xRel: 150, yRel: 360, color: 0xf59e0b }]
+        lanterns: [
+          { xRel: 40, yRel: 360, color: 0xfbbf24 },
+          { xRel: 150, yRel: 360, color: 0xf59e0b },
+        ],
       },
       {
-        x: 1875, w: 160, h: 415, roofPeak: 65,
+        x: 1875,
+        w: 160,
+        h: 415,
+        roofPeak: 65,
         awning: { yRel: 310, w: 145, h: 42, stripe1: 0xc2410c, stripe2: 0xfef3c7, sag: 16 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 2030, w: 185, h: 470, roofPeak: 80,
+        x: 2030,
+        w: 185,
+        h: 470,
+        roofPeak: 80,
         awning: { yRel: 350, w: 170, h: 46, stripe1: 0xb91c1c, stripe2: 0xf59e0b, sag: 18 },
-        stallShelves: true
+        stallShelves: true,
       },
       {
-        x: 2210, w: 355, h: 460, roofPeak: 75,
+        x: 2210,
+        w: 355,
+        h: 460,
+        roofPeak: 75,
         awning: { yRel: 345, w: 330, h: 46, stripe1: 0x991b1b, stripe2: 0xfef08a, sag: 19 },
         stallShelves: true,
-        lanterns: [{ xRel: 60, yRel: 330, color: 0xf59e0b }, { xRel: 280, yRel: 330, color: 0xfbbf24 }]
-      }
+        lanterns: [
+          { xRel: 60, yRel: 330, color: 0xf59e0b },
+          { xRel: 280, yRel: 330, color: 0xfbbf24 },
+        ],
+      },
     ];
 
     for (const mb of marketBuildings) {
@@ -1136,7 +1514,7 @@ export class BootScene extends Phaser.Scene {
       for (let s = 0; s < stripes; s++) {
         const sx1 = awnX + s * stripeW;
         const sx2 = sx1 + stripeW;
-        const color = (s % 2 === 0) ? awn.stripe1 : awn.stripe2;
+        const color = s % 2 === 0 ? awn.stripe1 : awn.stripe2;
 
         midGfx.fillStyle(color, 0.95);
         midGfx.beginPath();
@@ -1144,29 +1522,41 @@ export class BootScene extends Phaser.Scene {
         // Top forward slope
         bezierCurveTo(
           midGfx,
-          sx1, awnY,
-          sx1 + 4, awnY + awnH * 0.4,
-          sx1 + stripeW * 0.2, awnY + awnH * 0.8,
-          sx1, awnY + awnH,
-          6
+          sx1,
+          awnY,
+          sx1 + 4,
+          awnY + awnH * 0.4,
+          sx1 + stripeW * 0.2,
+          awnY + awnH * 0.8,
+          sx1,
+          awnY + awnH,
+          6,
         );
         // Scalloped ruffled bottom hem
         bezierCurveTo(
           midGfx,
-          sx1, awnY + awnH,
-          (sx1 + sx2) / 2, awnY + awnH + 8,
-          (sx1 + sx2) / 2, awnY + awnH + 8,
-          sx2, awnY + awnH,
-          6
+          sx1,
+          awnY + awnH,
+          (sx1 + sx2) / 2,
+          awnY + awnH + 8,
+          (sx1 + sx2) / 2,
+          awnY + awnH + 8,
+          sx2,
+          awnY + awnH,
+          6,
         );
         // Back upward slope
         bezierCurveTo(
           midGfx,
-          sx2, awnY + awnH,
-          sx2 - stripeW * 0.2, awnY + awnH * 0.8,
-          sx2 - 4, awnY + awnH * 0.4,
-          sx2, awnY,
-          6
+          sx2,
+          awnY + awnH,
+          sx2 - stripeW * 0.2,
+          awnY + awnH * 0.8,
+          sx2 - 4,
+          awnY + awnH * 0.4,
+          sx2,
+          awnY,
+          6,
         );
         midGfx.closePath();
         midGfx.fillPath();
@@ -1234,62 +1624,128 @@ export class BootScene extends Phaser.Scene {
 
     const industrialStructures: IndustrialStructure[] = [
       {
-        type: 'factory', x: 0, w: 180, h: 470, sawtoothBays: 2,
-        crossBraces: [{ xRel: 20, yRel: 180, w: 60, h: 65 }, { xRel: 100, yRel: 180, w: 60, h: 65 }]
+        type: 'factory',
+        x: 0,
+        w: 180,
+        h: 470,
+        sawtoothBays: 2,
+        crossBraces: [
+          { xRel: 20, yRel: 180, w: 60, h: 65 },
+          { xRel: 100, yRel: 180, w: 60, h: 65 },
+        ],
       },
       {
-        type: 'smokestack', x: 180, w: 130, h: 580, smokestackH: 580
+        type: 'smokestack',
+        x: 180,
+        w: 130,
+        h: 580,
+        smokestackH: 580,
       },
       {
-        type: 'factory', x: 310, w: 200, h: 450, sawtoothBays: 3,
-        crossBraces: [{ xRel: 25, yRel: 160, w: 70, h: 70 }, { xRel: 105, yRel: 160, w: 70, h: 70 }]
+        type: 'factory',
+        x: 310,
+        w: 200,
+        h: 450,
+        sawtoothBays: 3,
+        crossBraces: [
+          { xRel: 25, yRel: 160, w: 70, h: 70 },
+          { xRel: 105, yRel: 160, w: 70, h: 70 },
+        ],
       },
       {
-        type: 'tower', x: 510, w: 170, h: 520,
-        crossBraces: [{ xRel: 20, yRel: 120, w: 130, h: 90 }, { xRel: 20, yRel: 230, w: 130, h: 90 }]
+        type: 'tower',
+        x: 510,
+        w: 170,
+        h: 520,
+        crossBraces: [
+          { xRel: 20, yRel: 120, w: 130, h: 90 },
+          { xRel: 20, yRel: 230, w: 130, h: 90 },
+        ],
       },
       {
-        type: 'factory', x: 680, w: 155, h: 430,
-        crossBraces: [{ xRel: 25, yRel: 150, w: 105, h: 75 }]
+        type: 'factory',
+        x: 680,
+        w: 155,
+        h: 430,
+        crossBraces: [{ xRel: 25, yRel: 150, w: 105, h: 75 }],
       },
       {
-        type: 'smokestack', x: 835, w: 135, h: 590, smokestackH: 590
+        type: 'smokestack',
+        x: 835,
+        w: 135,
+        h: 590,
+        smokestackH: 590,
       },
       {
-        type: 'factory', x: 970, w: 210, h: 485,
-        crossBraces: [{ xRel: 30, yRel: 170, w: 70, h: 75 }, { xRel: 110, yRel: 170, w: 70, h: 75 }]
+        type: 'factory',
+        x: 970,
+        w: 210,
+        h: 485,
+        crossBraces: [
+          { xRel: 30, yRel: 170, w: 70, h: 75 },
+          { xRel: 110, yRel: 170, w: 70, h: 75 },
+        ],
       },
       {
-        type: 'factory', x: 1180, w: 160, h: 440,
-        crossBraces: [{ xRel: 20, yRel: 140, w: 120, h: 70 }]
+        type: 'factory',
+        x: 1180,
+        w: 160,
+        h: 440,
+        crossBraces: [{ xRel: 20, yRel: 140, w: 120, h: 70 }],
       },
       {
-        type: 'tower', x: 1340, w: 190, h: 525,
-        crossBraces: [{ xRel: 25, yRel: 140, w: 140, h: 95 }, { xRel: 25, yRel: 255, w: 140, h: 95 }]
+        type: 'tower',
+        x: 1340,
+        w: 190,
+        h: 525,
+        crossBraces: [
+          { xRel: 25, yRel: 140, w: 140, h: 95 },
+          { xRel: 25, yRel: 255, w: 140, h: 95 },
+        ],
       },
       {
-        type: 'smokestack', x: 1530, w: 130, h: 575, smokestackH: 575
+        type: 'smokestack',
+        x: 1530,
+        w: 130,
+        h: 575,
+        smokestackH: 575,
       },
       {
-        type: 'factory', x: 1660, w: 200, h: 460, sawtoothBays: 3,
-        crossBraces: [{ xRel: 25, yRel: 170, w: 70, h: 70 }, { xRel: 105, yRel: 170, w: 70, h: 70 }]
+        type: 'factory',
+        x: 1660,
+        w: 200,
+        h: 460,
+        sawtoothBays: 3,
+        crossBraces: [
+          { xRel: 25, yRel: 170, w: 70, h: 70 },
+          { xRel: 105, yRel: 170, w: 70, h: 70 },
+        ],
       },
       {
-        type: 'factory', x: 1860, w: 165, h: 505,
-        crossBraces: [{ xRel: 20, yRel: 160, w: 125, h: 80 }]
+        type: 'factory',
+        x: 1860,
+        w: 165,
+        h: 505,
+        crossBraces: [{ xRel: 20, yRel: 160, w: 125, h: 80 }],
       },
       {
-        type: 'factory', x: 2025, w: 175, h: 445,
-        crossBraces: [{ xRel: 25, yRel: 150, w: 125, h: 75 }]
+        type: 'factory',
+        x: 2025,
+        w: 175,
+        h: 445,
+        crossBraces: [{ xRel: 25, yRel: 150, w: 125, h: 75 }],
       },
       {
-        type: 'viaduct', x: 2200, w: 365, h: 495,
+        type: 'viaduct',
+        x: 2200,
+        w: 365,
+        h: 495,
         crossBraces: [
           { xRel: 30, yRel: 180, w: 90, h: 85 },
           { xRel: 140, yRel: 180, w: 90, h: 85 },
-          { xRel: 250, yRel: 180, w: 90, h: 85 }
-        ]
-      }
+          { xRel: 250, yRel: 180, w: 90, h: 85 },
+        ],
+      },
     ];
 
     for (const ind of industrialStructures) {
@@ -1333,7 +1789,6 @@ export class BootScene extends Phaser.Scene {
         midGfx.fillCircle(stackXCenter + 28, stackTopY - 36, 26);
         midGfx.fillStyle(0x3f3f46, 0.12);
         midGfx.fillCircle(stackXCenter + 52, stackTopY - 58, 38);
-
       } else {
         // Factory Building with Sawtooth roof or industrial parapet
         midGfx.beginPath();
@@ -1414,74 +1869,120 @@ export class BootScene extends Phaser.Scene {
 
     const overlookStructures: OverlookStructure[] = [
       {
-        x: 0, w: 190, h: 480,
+        x: 0,
+        w: 190,
+        h: 480,
         balcony: { xRel: 25, yRel: 240, w: 140, h: 22 },
         balustrades: { xRel: 10, yRel: 40, w: 170, h: 18 },
         windows: [
           { xRel: 35, yRel: 120, w: 32, h: 56, pediment: 'triangular' },
           { xRel: 80, yRel: 120, w: 32, h: 56, pediment: 'rounded' },
-          { xRel: 125, yRel: 120, w: 32, h: 56, pediment: 'triangular' }
-        ]
+          { xRel: 125, yRel: 120, w: 32, h: 56, pediment: 'triangular' },
+        ],
       },
       {
-        x: 185, w: 155, h: 565, hasCupola: true, cupolaW: 75, cupolaH: 85,
-        balcony: { xRel: 20, yRel: 320, w: 115, h: 20 }
+        x: 185,
+        w: 155,
+        h: 565,
+        hasCupola: true,
+        cupolaW: 75,
+        cupolaH: 85,
+        balcony: { xRel: 20, yRel: 320, w: 115, h: 20 },
       },
       {
-        x: 335, w: 205, h: 470,
+        x: 335,
+        w: 205,
+        h: 470,
         balcony: { xRel: 30, yRel: 230, w: 145, h: 22 },
-        balustrades: { xRel: 15, yRel: 35, w: 175, h: 18 }
+        balustrades: { xRel: 15, yRel: 35, w: 175, h: 18 },
       },
       {
-        x: 535, w: 175, h: 515, hasCupola: true, cupolaW: 85, cupolaH: 90,
-        balcony: { xRel: 25, yRel: 280, w: 125, h: 20 }
+        x: 535,
+        w: 175,
+        h: 515,
+        hasCupola: true,
+        cupolaW: 85,
+        cupolaH: 90,
+        balcony: { xRel: 25, yRel: 280, w: 125, h: 20 },
       },
       {
-        x: 705, w: 195, h: 455,
+        x: 705,
+        w: 195,
+        h: 455,
         balustrades: { xRel: 15, yRel: 30, w: 165, h: 18 },
-        balcony: { xRel: 35, yRel: 210, w: 125, h: 22 }
+        balcony: { xRel: 35, yRel: 210, w: 125, h: 22 },
       },
       {
-        x: 895, w: 160, h: 585, hasCupola: true, cupolaW: 80, cupolaH: 95,
-        balcony: { xRel: 25, yRel: 340, w: 110, h: 20 }
+        x: 895,
+        w: 160,
+        h: 585,
+        hasCupola: true,
+        cupolaW: 80,
+        cupolaH: 95,
+        balcony: { xRel: 25, yRel: 340, w: 110, h: 20 },
       },
       {
-        x: 1050, w: 200, h: 480,
+        x: 1050,
+        w: 200,
+        h: 480,
         balcony: { xRel: 35, yRel: 240, w: 130, h: 22 },
-        balustrades: { xRel: 15, yRel: 40, w: 170, h: 18 }
+        balustrades: { xRel: 15, yRel: 40, w: 170, h: 18 },
       },
       {
-        x: 1245, w: 170, h: 445,
+        x: 1245,
+        w: 170,
+        h: 445,
         balustrades: { xRel: 15, yRel: 30, w: 140, h: 18 },
-        balcony: { xRel: 25, yRel: 210, w: 120, h: 20 }
+        balcony: { xRel: 25, yRel: 210, w: 120, h: 20 },
       },
       {
-        x: 1410, w: 185, h: 545, hasCupola: true, cupolaW: 90, cupolaH: 90,
-        balcony: { xRel: 30, yRel: 300, w: 125, h: 20 }
+        x: 1410,
+        w: 185,
+        h: 545,
+        hasCupola: true,
+        cupolaW: 90,
+        cupolaH: 90,
+        balcony: { xRel: 30, yRel: 300, w: 125, h: 20 },
       },
       {
-        x: 1590, w: 175, h: 465,
+        x: 1590,
+        w: 175,
+        h: 465,
         balustrades: { xRel: 15, yRel: 35, w: 145, h: 18 },
-        balcony: { xRel: 25, yRel: 225, w: 125, h: 22 }
+        balcony: { xRel: 25, yRel: 225, w: 125, h: 22 },
       },
       {
-        x: 1760, w: 195, h: 520, hasCupola: true, cupolaW: 85, cupolaH: 95,
-        balcony: { xRel: 30, yRel: 290, w: 135, h: 20 }
+        x: 1760,
+        w: 195,
+        h: 520,
+        hasCupola: true,
+        cupolaW: 85,
+        cupolaH: 95,
+        balcony: { xRel: 30, yRel: 290, w: 135, h: 20 },
       },
       {
-        x: 1950, w: 165, h: 455,
+        x: 1950,
+        w: 165,
+        h: 455,
         balustrades: { xRel: 15, yRel: 35, w: 135, h: 18 },
-        balcony: { xRel: 20, yRel: 220, w: 125, h: 20 }
+        balcony: { xRel: 20, yRel: 220, w: 125, h: 20 },
       },
       {
-        x: 2110, w: 175, h: 555, hasCupola: true, cupolaW: 80, cupolaH: 90,
-        balcony: { xRel: 25, yRel: 310, w: 125, h: 20 }
+        x: 2110,
+        w: 175,
+        h: 555,
+        hasCupola: true,
+        cupolaW: 80,
+        cupolaH: 90,
+        balcony: { xRel: 25, yRel: 310, w: 125, h: 20 },
       },
       {
-        x: 2280, w: 285, h: 495,
+        x: 2280,
+        w: 285,
+        h: 495,
         balustrades: { xRel: 20, yRel: 40, w: 245, h: 20 },
-        balcony: { xRel: 40, yRel: 250, w: 205, h: 22 }
-      }
+        balcony: { xRel: 40, yRel: 250, w: 205, h: 22 },
+      },
     ];
 
     for (const os of overlookStructures) {
@@ -1617,7 +2118,7 @@ export class BootScene extends Phaser.Scene {
     const curbWidths = [85, 70, 95, 80, 75, 90, 85, 100, 70, 80, 90, 85, 75, 95, 85];
     for (let i = 0; curbX < 1280; i++) {
       const cw = curbWidths[i % curbWidths.length];
-      const isAlt = (i % 2 === 0);
+      const isAlt = i % 2 === 0;
 
       streetGfx.fillStyle(isAlt ? 0x242a35 : 0x1f242e, 1);
       streetGfx.fillRect(curbX, 560, cw, 24);
@@ -1634,9 +2135,7 @@ export class BootScene extends Phaser.Scene {
     streetGfx.fillStyle(0x0e1014, 1);
     streetGfx.fillRect(0, 584, 1280, 136);
 
-    const cobblestonePalettes = [
-      0x242934, 0x1b1e26, 0x28231f, 0x1e222a, 0x2b2723, 0x181a21
-    ];
+    const cobblestonePalettes = [0x242934, 0x1b1e26, 0x28231f, 0x1e222a, 0x2b2723, 0x181a21];
 
     let seed = 42891;
     const deterministicRandom = () => {
@@ -1645,15 +2144,19 @@ export class BootScene extends Phaser.Scene {
     };
 
     const rowConfigs = [
-      { y: 588, h: 17 }, { y: 609, h: 18 }, { y: 631, h: 19 },
-      { y: 654, h: 20 }, { y: 678, h: 21 }, { y: 703, h: 22 }
+      { y: 588, h: 17 },
+      { y: 609, h: 18 },
+      { y: 631, h: 19 },
+      { y: 654, h: 20 },
+      { y: 678, h: 21 },
+      { y: 703, h: 22 },
     ];
 
     for (let r = 0; r < rowConfigs.length; r++) {
       const cfg = rowConfigs[r];
       const rowY = cfg.y;
       const baseH = cfg.h;
-      const initialOffset = (r % 2 === 0) ? -28 : -48;
+      const initialOffset = r % 2 === 0 ? -28 : -48;
       let currX = initialOffset;
 
       while (currX < 1320) {
@@ -1676,7 +2179,7 @@ export class BootScene extends Phaser.Scene {
         streetGfx.fillRoundedRect(currX, rowY + jitterY, stoneW, stoneH, cornerRadius);
 
         const highlightW = Math.max(8, stoneW - 10);
-        const hasAmberReflection = (deterministicRandom() > 0.82);
+        const hasAmberReflection = deterministicRandom() > 0.82;
 
         if (hasAmberReflection) {
           streetGfx.fillStyle(0xf59e0b, 0.18);
@@ -1992,7 +2495,14 @@ export class BootScene extends Phaser.Scene {
     const crate3Gfx = this.make.graphics({ x: 0, y: 0 });
     // Bulging burlap sack silhouette
     const sackPts: [number, number][] = [
-      [22, 4], [28, 12], [38, 22], [36, 38], [22, 40], [8, 38], [6, 22], [16, 12]
+      [22, 4],
+      [28, 12],
+      [38, 22],
+      [36, 38],
+      [22, 40],
+      [8, 38],
+      [6, 22],
+      [16, 12],
     ];
     crate3Gfx.fillStyle(0x78350f, 1);
     crate3Gfx.beginPath();
@@ -2038,9 +2548,19 @@ export class BootScene extends Phaser.Scene {
 
     crate4Gfx.fillStyle(0x09090b, 1);
     crate4Gfx.beginPath();
-    crate4Gfx.moveTo(8, 28); crate4Gfx.lineTo(14, 28); crate4Gfx.lineTo(20, 16); crate4Gfx.lineTo(14, 16); crate4Gfx.closePath(); crate4Gfx.fillPath();
+    crate4Gfx.moveTo(8, 28);
+    crate4Gfx.lineTo(14, 28);
+    crate4Gfx.lineTo(20, 16);
+    crate4Gfx.lineTo(14, 16);
+    crate4Gfx.closePath();
+    crate4Gfx.fillPath();
     crate4Gfx.beginPath();
-    crate4Gfx.moveTo(20, 28); crate4Gfx.lineTo(26, 28); crate4Gfx.lineTo(32, 16); crate4Gfx.lineTo(26, 16); crate4Gfx.closePath(); crate4Gfx.fillPath();
+    crate4Gfx.moveTo(20, 28);
+    crate4Gfx.lineTo(26, 28);
+    crate4Gfx.lineTo(32, 16);
+    crate4Gfx.lineTo(26, 16);
+    crate4Gfx.closePath();
+    crate4Gfx.fillPath();
 
     // Perimeter riveted steel brackets
     crate4Gfx.fillStyle(0x71717a, 1);
@@ -2095,8 +2615,16 @@ export class BootScene extends Phaser.Scene {
 
   private createHazardPuddles(): void {
     const puddlePts: [number, number][] = [
-      [7, 9], [13, 4.5], [24, 3], [37, 3.5], [49, 5.5],
-      [55, 9.5], [48, 14], [35, 15.5], [21, 15], [11, 13]
+      [7, 9],
+      [13, 4.5],
+      [24, 3],
+      [37, 3.5],
+      [49, 5.5],
+      [55, 9.5],
+      [48, 14],
+      [35, 15.5],
+      [21, 15],
+      [11, 13],
     ];
 
     // ---------------------------------------------------------

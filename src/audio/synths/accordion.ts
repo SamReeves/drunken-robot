@@ -38,7 +38,7 @@ export class AccordionSynth extends BaseInstrument {
         modulation: { type: 'triangle' },
         modulationEnvelope: { attack: 0.04, decay: 0.2, sustain: 0.8, release: 0.15 },
         volume: -4,
-      })
+      }),
     );
 
     this.musetteVoice = this.track(
@@ -51,11 +51,11 @@ export class AccordionSynth extends BaseInstrument {
         modulation: { type: 'triangle' },
         modulationEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.75, release: 0.15 },
         volume: -5,
-      })
+      }),
     );
 
     this.bellowsFilter = this.track(
-      new Tone.Filter({ frequency: 2400, type: 'lowpass', rolloff: -24, Q: 1.2 })
+      new Tone.Filter({ frequency: 2400, type: 'lowpass', rolloff: -24, Q: 1.2 }),
     );
     this.bellowsGain = this.track(new Tone.Gain(0.85));
 
@@ -97,7 +97,10 @@ export class AccordionSynth extends BaseInstrument {
     const now = Tone.now();
     const elapsed = now - this.lastModIndexTime;
     const delta = Math.abs(targetModIndex - this.lastModIndexApplied);
-    if (elapsed >= AccordionSynth.MOD_INDEX_UPDATE_INTERVAL_SEC && delta >= AccordionSynth.MOD_INDEX_MIN_DELTA) {
+    if (
+      elapsed >= AccordionSynth.MOD_INDEX_UPDATE_INTERVAL_SEC &&
+      delta >= AccordionSynth.MOD_INDEX_MIN_DELTA
+    ) {
       this.centerVoice.set({ modulationIndex: targetModIndex });
       this.musetteVoice.set({ modulationIndex: targetModIndex * 0.95 });
       this.lastModIndexApplied = targetModIndex;
@@ -123,7 +126,7 @@ export class AccordionSynth extends BaseInstrument {
   public triggerAttack(
     notes: Tone.Unit.Frequency | Tone.Unit.Frequency[],
     time?: Tone.Unit.Time,
-    velocity = 0.8
+    velocity = 0.8,
   ): void {
     this.centerVoice.triggerAttack(notes, time, velocity);
     this.musetteVoice.triggerAttack(notes, time, velocity * 0.9);
@@ -138,7 +141,7 @@ export class AccordionSynth extends BaseInstrument {
     notes: Tone.Unit.Frequency | Tone.Unit.Frequency[],
     duration: Tone.Unit.Time,
     time?: Tone.Unit.Time,
-    velocity = 0.8
+    velocity = 0.8,
   ): void {
     this.centerVoice.triggerAttackRelease(notes, duration, time, velocity);
     this.musetteVoice.triggerAttackRelease(notes, duration, time, velocity * 0.9);

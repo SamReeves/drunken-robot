@@ -20,7 +20,7 @@ export class FlamencoGuitarSynth extends BaseInstrument {
         oscillator: { type: 'triangle' },
         envelope: { attack: 0.003, decay: 0.35, sustain: 0.08, release: 0.22 },
         volume: -3,
-      })
+      }),
     );
 
     this.bodyFilter = this.track(new Tone.Filter({ frequency: 2600, type: 'lowpass', rolloff: -12, Q: 1.4 }));
@@ -32,7 +32,7 @@ export class FlamencoGuitarSynth extends BaseInstrument {
   public triggerAttack(
     notes: Tone.Unit.Frequency | Tone.Unit.Frequency[],
     time?: Tone.Unit.Time,
-    velocity = 0.8
+    velocity = 0.8,
   ): void {
     this.polySynth.triggerAttack(notes, time, velocity);
   }
@@ -45,7 +45,7 @@ export class FlamencoGuitarSynth extends BaseInstrument {
     notes: Tone.Unit.Frequency | Tone.Unit.Frequency[],
     duration: Tone.Unit.Time,
     time?: Tone.Unit.Time,
-    velocity = 0.8
+    velocity = 0.8,
   ): void {
     this.polySynth.triggerAttackRelease(notes, duration, time, velocity);
   }
@@ -60,7 +60,7 @@ export class FlamencoGuitarSynth extends BaseInstrument {
     time?: Tone.Unit.Time,
     direction: 'down' | 'up' = 'down',
     speed = 0.018,
-    duration: Tone.Unit.Time = '8n'
+    duration: Tone.Unit.Time = '8n',
   ): void {
     const baseTime = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
     const orderedNotes = direction === 'down' ? [...notes] : [...notes].reverse();

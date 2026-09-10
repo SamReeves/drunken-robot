@@ -74,4 +74,3 @@ export interface ConductorStepEvent {
 export interface ConductorListener {
   (event: ConductorStepEvent): void;
 }
-

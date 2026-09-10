@@ -191,19 +191,22 @@ export class EndScene extends Phaser.Scene {
 
     const stats = [
       { label: 'Total Tips Busked', value: `${finalState.tips} 🪙 Copper Gears`, color: '#fef08a' },
-      { label: 'Distance Traveled', value: `${Math.floor(finalState.distanceTraveled)} px (All 5 Acts Navigated)`, color: '#67e8f9' },
+      {
+        label: 'Distance Traveled',
+        value: `${Math.floor(finalState.distanceTraveled)} px (All 5 Acts Navigated)`,
+        color: '#67e8f9',
+      },
       { label: 'Final Act Biome', value: 'Act V: The Sunrise Overlook', color: '#f472b6' },
       { label: 'Ensemble Recruited', value: 'Full Balkan Band (6/6 Instruments)', color: '#a7f3d0' },
     ];
 
     stats.forEach((st, idx) => {
       const rowY = 245 + idx * 42;
-      this.add
-        .text(panelX - 190, rowY, st.label, {
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontSize: '13px',
-          color: '#94a3b8',
-        });
+      this.add.text(panelX - 190, rowY, st.label, {
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontSize: '13px',
+        color: '#94a3b8',
+      });
 
       this.add
         .text(panelX + 190, rowY, st.value, {

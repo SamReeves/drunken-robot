@@ -40,7 +40,7 @@ export class KlezmerClarinetSynth extends BaseInstrument {
         },
         portamento: params?.portamento ?? 0.035,
         volume: -4,
-      })
+      }),
     );
 
     this.woodFilter = this.track(new Tone.Filter({ frequency: 1600, type: 'bandpass', Q: 1.6 }));
@@ -61,7 +61,7 @@ export class KlezmerClarinetSynth extends BaseInstrument {
     note: Tone.Unit.Frequency,
     duration: Tone.Unit.Time,
     time?: Tone.Unit.Time,
-    velocity = 0.85
+    velocity = 0.85,
   ): void {
     this.synth.triggerAttackRelease(note, duration, time, velocity);
   }

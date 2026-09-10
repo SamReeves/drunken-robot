@@ -11,9 +11,9 @@ export const ACT_SWAY_TORQUES: Record<number, number> = {
 
 export const ACT_STABILITY_THRESHOLDS: Record<number, number> = {
   1: 0.55,
-  2: 0.50,
+  2: 0.5,
   3: 0.45,
-  4: 0.40,
+  4: 0.4,
   5: 0.35,
 };
 
@@ -53,7 +53,7 @@ interface SteamParticle {
  * 4. Decoupled telemetry emission via EventBus
  */
 export class Robot extends Phaser.GameObjects.Container {
-  public declare body: Phaser.Physics.Arcade.Body;
+  declare public body: Phaser.Physics.Arcade.Body;
 
   // Stagger & Balance Physics
   private wobblePhase = 0;
@@ -124,14 +124,7 @@ export class Robot extends Phaser.GameObjects.Container {
     this.eyeGfx = scene.add.graphics();
     this.steamGfx = scene.add.graphics();
 
-    this.add([
-      this.shadowGfx,
-      this.limbsGfx,
-      this.chassisGfx,
-      this.accordionGfx,
-      this.eyeGfx,
-      this.steamGfx,
-    ]);
+    this.add([this.shadowGfx, this.limbsGfx, this.chassisGfx, this.accordionGfx, this.eyeGfx, this.steamGfx]);
 
     // Initial render
     this.redrawVisuals(0, 0, 0);
@@ -220,9 +213,7 @@ export class Robot extends Phaser.GameObjects.Container {
     } else if (this.isChargingBellows) {
       // Space released -> Fire Accordion Jump if grounded or within coyote time
       if (canJump) {
-        const baseJump = this.ctx.activeBuff === 'jump'
-          ? Robot.BASE_JUMP_FORCE * 2
-          : Robot.BASE_JUMP_FORCE;
+        const baseJump = this.ctx.activeBuff === 'jump' ? Robot.BASE_JUMP_FORCE * 2 : Robot.BASE_JUMP_FORCE;
         const jumpForce = baseJump + this.bellowsPressure * Robot.MAX_JUMP_BOOST;
         this.body.setVelocityY(-jumpForce);
         this.coyoteTimer = 0;
@@ -314,11 +305,7 @@ export class Robot extends Phaser.GameObjects.Container {
 
     // Critical Stumble Check (Balance failure past threshold)
     const stabilityThreshold = this.getDynamicStabilityThreshold();
-    if (
-      Math.abs(this.wobbleAngle) > stabilityThreshold &&
-      this.stumbleCooldown <= 0 &&
-      isGrounded
-    ) {
+    if (Math.abs(this.wobbleAngle) > stabilityThreshold && this.stumbleCooldown <= 0 && isGrounded) {
       this.triggerStumble();
     }
   }
@@ -349,11 +336,9 @@ export class Robot extends Phaser.GameObjects.Container {
     }
 
     const currentThreshold = this.getDynamicStabilityThreshold();
-    const severity = severityOverride ?? Phaser.Math.Clamp(
-      (Math.abs(this.wobbleAngle) - currentThreshold) / 0.12 + 0.45,
-      0.4,
-      1.0
-    );
+    const severity =
+      severityOverride ??
+      Phaser.Math.Clamp((Math.abs(this.wobbleAngle) - currentThreshold) / 0.12 + 0.45, 0.4, 1.0);
 
     eventBus.emit('PLAYER_STUMBLE', {
       direction: this.stumbleDirection,

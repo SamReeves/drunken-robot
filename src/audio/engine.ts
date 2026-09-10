@@ -89,7 +89,9 @@ export class AudioEngine {
    */
   public startTransport(): void {
     if (Tone.getContext().state !== 'running') {
-      console.warn('[AudioEngine] Cannot start transport while audio context is suspended. Call init() first.');
+      console.warn(
+        '[AudioEngine] Cannot start transport while audio context is suspended. Call init() first.',
+      );
       return;
     }
     if (Tone.getTransport().state !== 'started') {
