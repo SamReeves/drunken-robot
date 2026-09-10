@@ -439,7 +439,14 @@ export class MusicDirector {
           for (const s of voice.strums ?? []) {
             const chord = this.currentChordVoicing.map(midiToNote);
             schedule(s.step, 0, (t) =>
-              this.guitar.strumChord(chord, t, s.direction, s.direction === 'down' ? 0.016 : 0.012, '8n'),
+              this.guitar.strumChord(
+                chord,
+                t,
+                s.direction,
+                s.direction === 'down' ? 0.016 : 0.012,
+                '8n',
+                s.velocity,
+              ),
             );
           }
           break;
