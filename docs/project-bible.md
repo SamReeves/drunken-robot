@@ -1,10 +1,10 @@
 # Project Bible: The Drunken Robot's Journey Home
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Author:** AMBloom
-**Target Environment:** Ubuntu 24.04 LTS | Antigravity v2.0.11+ | Node.js 20+
-**Core Tech Stack:** Vite, Phaser 3, Tone.js, Vanilla TypeScript, Mintlify
-**Local Path:** `/home/andrew/Drunken Robot`
+**Target Environment:** Any modern browser | Node.js 22+ for development
+**Core Tech Stack:** Vite, Phaser 4, Tone.js, Vanilla TypeScript
+**Repository:** `SamReeves/drunken-robot` (canonical), live at https://drunkenrobot.whalegames.net
 
 ## 1. Executive Summary & Vision
 
@@ -60,15 +60,15 @@ The robot's journey progresses through five distinct zones, each shifting the vi
 
 ## 7. Toolchain & Workspace
 
-* **Engine / Frontend:** Phaser 3, Tone.js, Vite.
+* **Engine / Frontend:** Phaser 4, Tone.js, Vite.
 * **Documentation:** Mintlify (Docs-as-code), Repomix (context packing for LLMs).
 * **Art:** Krita (painting), LDtk (level design), Free Tex Packer (spritesheets).
 * **Audio:** Audacity (trimming), Polyphone (SoundFonts), MuseScore (MIDI sequencing).
-* **Version Control:** Git, pushed to `AMBloom/drunken-robot` via GitHub Actions for automated deployment.
+* **Version Control & Deploy:** Git on GitHub; `deploy.yml` builds `main` and publishes to the `deploy` branch, served by DigitalOcean App Platform.
 
 ## 8. Development Roadmap
 
 * **Phase 1: Audio Core & Procedural Engine** (Tone.js transport clock, procedural accordion, modal quantizers).
-* **Phase 2: Game Engine & Mechanical Stumble** (Phaser 3 canvas, parallax layers, wobbly physics controller).
+* **Phase 2: Game Engine & Mechanical Stumble** (Phaser 4 canvas, parallax layers, wobbly physics controller).
 * **Phase 3: Audio-Gameplay Bridge & Busking Economy** (EventBus coupling, tip collection, ensemble recruitment UI).
 * **Phase 4: Polish, Narrative Flair, & Deployment** (Act biomes, asset integration, performance profiling, CI/CD).
