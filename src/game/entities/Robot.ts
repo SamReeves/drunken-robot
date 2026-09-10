@@ -21,6 +21,8 @@ export interface RobotContext {
   shielded: boolean;
   /** Forward auto-walk speed for the current act, px/s. */
   walkSpeed: number;
+  /** Skip the 360° stumble spin and other large motion. */
+  reducedMotion: boolean;
 }
 
 /**
@@ -69,7 +71,13 @@ export class Robot extends Phaser.GameObjects.Container {
   private readonly steamParticles: SteamParticle[] = [];
   private readonly renderer: RobotRenderer;
   private readonly fx: Rng;
-  private ctx: RobotContext = { activeAct: 1, activeBuff: null, shielded: false, walkSpeed: 180 };
+  private ctx: RobotContext = {
+    activeAct: 1,
+    activeBuff: null,
+    shielded: false,
+    walkSpeed: 180,
+    reducedMotion: false,
+  };
 
   constructor(scene: Phaser.Scene, x: number, y: number, seed: number) {
     super(scene, x, y);
@@ -232,12 +240,17 @@ export class Robot extends Phaser.GameObjects.Container {
 
     this.spinTween?.stop();
     this.spinAngleOffset = 0;
-    this.spinTween = this.scene.tweens.add({
-      targets: this,
-      spinAngleOffset: this.stumbleDirection === 'right' ? Math.PI * 2 : -Math.PI * 2,
-      duration: 850,
-      ease: 'Cubic.easeOut',
-    });
+    if (this.ctx.reducedMotion) {
+      // A short alpha flash instead of a full spin
+      this.scene.tweens.add({ targets: this, alpha: { from: 0.35, to: 1 }, duration: 200 });
+    } else {
+      this.spinTween = this.scene.tweens.add({
+        targets: this,
+        spinAngleOffset: this.stumbleDirection === 'right' ? Math.PI * 2 : -Math.PI * 2,
+        duration: 850,
+        ease: 'Cubic.easeOut',
+      });
+    }
 
     const threshold = this.getDynamicStabilityThreshold();
     const severity =

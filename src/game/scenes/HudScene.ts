@@ -3,6 +3,8 @@ import { store } from '../../state/store.ts';
 import { eventBus } from '../../state/eventBus.ts';
 import { ACT_COUNT, ACT_MIN_DISTANCE, METERS_PER_PX, MOMENTUM, TIER, VICTORY_DISTANCE } from '../balance.ts';
 import { HUD_REGISTRY_KEY, SceneKeys, type HudTelemetry } from './keys.ts';
+import type { AppFlags } from '../../app/flags.ts';
+import { touchLayout } from '../systems/TouchControls.ts';
 
 const FONT_SANS = 'system-ui, sans-serif';
 const FONT_MONO = 'monospace';
@@ -46,6 +48,8 @@ export class HudScene extends Phaser.Scene {
   private unsubscribers: Array<() => void> = [];
   private gustUntil = 0;
 
+  private static readonly TOUCH_HINT =
+    'Hold left / right side to balance   •   Hold the bellows button to jump';
   private static readonly CONTROLS_HINT =
     'A / D (← / →) : Balance   •   Hold SPACE : Accordion Jump   •   P : Pause';
 
@@ -55,6 +59,9 @@ export class HudScene extends Phaser.Scene {
 
   create(): void {
     const { width, height } = this.scale;
+    const flags = this.registry.get('flags') as AppFlags | undefined;
+    const touch = flags?.coarsePointer ?? false;
+    if (touch) this.drawTouchGuides(width, height);
 
     // Act badge (top left)
     this.actBadgeBg = this.add.graphics();
@@ -101,7 +108,7 @@ export class HudScene extends Phaser.Scene {
 
     // Controls hint and gauges (top right)
     this.statusText = this.add
-      .text(width - 20, 20, HudScene.CONTROLS_HINT, {
+      .text(width - 20, 20, touch ? HudScene.TOUCH_HINT : HudScene.CONTROLS_HINT, {
         fontFamily: FONT_MONO,
         fontSize: '14px',
         color: '#d1d5db',
@@ -219,6 +226,9 @@ export class HudScene extends Phaser.Scene {
     }
 
     // Status line
+    const hint = (this.registry.get('flags') as AppFlags | undefined)?.coarsePointer
+      ? HudScene.TOUCH_HINT
+      : HudScene.CONTROLS_HINT;
     if (telemetry?.isStumbling) {
       this.statusText.setText('⚠️ STUMBLE! Rhythm warped, recovering...').setColor('#ef4444');
     } else if (pressure > 0) {
@@ -226,7 +236,7 @@ export class HudScene extends Phaser.Scene {
         .setText(`💨 Charging bellows: ${Math.round(pressure * 100)}%  (release to jump)`)
         .setColor('#f59e0b');
     } else {
-      this.statusText.setText(HudScene.CONTROLS_HINT).setColor('#d1d5db');
+      this.statusText.setText(hint).setColor('#d1d5db');
     }
 
     // Buff badge
@@ -264,6 +274,29 @@ export class HudScene extends Phaser.Scene {
     balance: { label: '🍾 STEADY LEGS', stroke: 0x10b981, fill: 0x022c22, text: '#34d399' },
     steam: { label: '💨 STEAM JUMP', stroke: 0xe5e7eb, fill: 0x1f2937, text: '#fef3c7' },
   } as const;
+
+  /** Faint zone markers for thumbs: a centre divider and the bellows button. */
+  private drawTouchGuides(width: number, height: number): void {
+    const layout = touchLayout(width, height);
+    const g = this.add.graphics().setDepth(-1);
+    g.lineStyle(1, 0xffffff, 0.08);
+    g.lineBetween(width / 2, height * 0.25, width / 2, height - 20);
+    const b = layout.bellows;
+    g.fillStyle(0xf59e0b, 0.12);
+    g.fillRoundedRect(b.x, b.y, b.size, b.size, 24);
+    g.lineStyle(2, 0xf59e0b, 0.5);
+    g.strokeRoundedRect(b.x, b.y, b.size, b.size, 24);
+    this.add
+      .text(b.x + b.size / 2, b.y + b.size / 2, '💨\nJUMP', {
+        fontFamily: FONT_SANS,
+        fontSize: '16px',
+        color: '#fef3c7',
+        fontStyle: 'bold',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.7);
+  }
 
   private drawBadgeBg(strokeColor: number): void {
     this.actBadgeBg.clear();

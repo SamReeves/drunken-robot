@@ -6,6 +6,8 @@ import { ensureActTextures, releaseActTextures } from '../art/textureFactory.ts'
 import { ACT_WALK_SPEED, BUFFS } from '../balance.ts';
 import { HazardSpawner, type Chunk } from '../systems/HazardSpawner.ts';
 import { Rng } from '../systems/Rng.ts';
+import { InputController } from '../systems/InputController.ts';
+import type { AppFlags } from '../../app/flags.ts';
 import {
   HUD_REGISTRY_KEY,
   SceneKeys,
@@ -56,11 +58,8 @@ export class StreetScene extends Phaser.Scene {
   private powerupsGroup!: Phaser.Physics.Arcade.Group;
   private spawner!: HazardSpawner;
 
-  private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
-  private keyA?: Phaser.Input.Keyboard.Key;
-  private keyD?: Phaser.Input.Keyboard.Key;
-  private keyW?: Phaser.Input.Keyboard.Key;
-  private keySpace?: Phaser.Input.Keyboard.Key;
+  private inputController!: InputController;
+  private flags: AppFlags | undefined;
   private keyP?: Phaser.Input.Keyboard.Key;
   private keyEsc?: Phaser.Input.Keyboard.Key;
 
@@ -84,6 +83,8 @@ export class StreetScene extends Phaser.Scene {
     this.cleanupListeners();
     this.physics.resume();
 
+    this.flags = this.registry.get('flags') as AppFlags | undefined;
+    const reduced = this.flags?.reducedMotion ?? false;
     const seed = store.getState().seed;
     const rng = new Rng(seed);
     this.spawner = new HazardSpawner(rng.fork('spawner'));
@@ -100,7 +101,8 @@ export class StreetScene extends Phaser.Scene {
     addLayer('distant', 'bg_distant', 0.25);
     addLayer('midground', `bg_midground_act${initialAct}`, 0.55);
     addLayer('street', 'bg_street', 1.0);
-    addLayer('foreground', 'bg_foreground', 1.25);
+    // Reduced motion halves the fast foreground layer, the most vection-inducing one
+    addLayer('foreground', 'bg_foreground', reduced ? 0.6 : 1.25);
 
     // 2. Ground platform at the curb baseline
     this.groundPlatform = this.add
@@ -156,13 +158,9 @@ export class StreetScene extends Phaser.Scene {
   }
 
   private setupInputControls(): void {
+    this.inputController = new InputController(this, this.flags?.coarsePointer ?? false);
     const keyboard = this.input.keyboard;
     if (!keyboard) return;
-    this.cursors = keyboard.createCursorKeys();
-    this.keyA = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.keyD = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.keyW = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.keySpace = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.keyP = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     this.keyEsc = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.keyP.on('down', () => this.togglePause());
@@ -259,6 +257,7 @@ export class StreetScene extends Phaser.Scene {
     const tip = this.tipsGroup.create(x, y, 'item_tip_gear') as Phaser.Physics.Arcade.Sprite;
     tip.setOrigin(0.5, 0.5);
     (tip.body as Phaser.Physics.Arcade.Body | null)?.setSize(22, 22);
+    if (this.flags?.reducedMotion) return;
     this.tweens.add({
       targets: tip,
       y: y - 6,
@@ -368,7 +367,7 @@ export class StreetScene extends Phaser.Scene {
 
     hazard.setTint(0xef4444);
     this.robot.triggerStumble(0.85, hazardType);
-    this.cameras.main.shake(180, 0.005);
+    if (!this.flags?.reducedMotion) this.cameras.main.shake(180, 0.005);
     eventBus.emit('HAZARD_HIT', { x, y, hazardType });
     this.floatText(x, y - 25, 'STUMBLE! ⚠️', '#ef4444', 15, 750, 25);
   }
@@ -413,13 +412,7 @@ export class StreetScene extends Phaser.Scene {
     const dt = Math.min(delta / 1000, 0.1);
     store.decayMomentum(dt);
 
-    const inputs: RobotInputs = {
-      left: Boolean(this.cursors?.left.isDown || this.keyA?.isDown),
-      right: Boolean(this.cursors?.right.isDown || this.keyD?.isDown),
-      jump: Boolean(
-        this.cursors?.space.isDown || this.keySpace?.isDown || this.keyW?.isDown || this.cursors?.up.isDown,
-      ),
-    };
+    const inputs: RobotInputs = this.inputController.read();
 
     const state = store.getState();
     const ctx: RobotContext = {
@@ -427,6 +420,7 @@ export class StreetScene extends Phaser.Scene {
       activeBuff: state.activeBuff,
       shielded: state.shieldCharges > 0,
       walkSpeed: ACT_WALK_SPEED[state.activeAct - 1] ?? ACT_WALK_SPEED[0],
+      reducedMotion: this.flags?.reducedMotion ?? false,
     };
     this.robot.update(time, delta, inputs, ctx);
 
