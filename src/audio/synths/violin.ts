@@ -60,6 +60,17 @@ export class GypsyViolinSynth extends BaseInstrument {
     this.synth.triggerAttackRelease(note, duration, time, velocity);
   }
 
+  /** A short falling slide, for a splash into a puddle. */
+  public triggerSlideDown(time?: Tone.Unit.Time, velocity = 0.7): void {
+    const t = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
+    const detune = this.synth.detune;
+    detune.cancelScheduledValues(t);
+    detune.setValueAtTime(0, t);
+    detune.linearRampToValueAtTime(-700, t + 0.35);
+    detune.setValueAtTime(0, t + 0.4);
+    this.synth.triggerAttackRelease('A4', 0.35, t, velocity);
+  }
+
   public setVibrato(frequency: number, depthCents: number): void {
     this.vibratoLfo.frequency.value = frequency;
     this.vibratoLfo.min = -depthCents;

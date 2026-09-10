@@ -71,7 +71,7 @@ export const ACT_DEFINITIONS: ActDefinition[] = [
       foreground: 0xffffff,
     },
     audioConfig: {
-      scale: 'D_PHRYGIAN_DOMINANT',
+      scale: 'D_FREYGISH',
       meter: '4/4',
       bpm: 120,
       description: 'Intimate, raw Czárdás. Rowdy accordion lead, simple kick drum.',
@@ -91,7 +91,7 @@ export const ACT_DEFINITIONS: ActDefinition[] = [
     },
     audioConfig: {
       scale: 'D_HARMONIC_MINOR',
-      meter: '7/8_322',
+      meter: '3/4',
       bpm: 115,
       description: 'Melancholic Klezmer Waltzes. Flowing upright bass, searing violin.',
     },
@@ -109,8 +109,8 @@ export const ACT_DEFINITIONS: ActDefinition[] = [
       foreground: 0xf97316,
     },
     audioConfig: {
-      scale: 'D_PHRYGIAN_DOMINANT',
-      meter: '7/8_223',
+      scale: 'D_MISHEBERAKH',
+      meter: '9/8_2223',
       bpm: 138,
       description: 'Polyrhythmic Balkan Chaos. Rapid rasgueado (flamenco guitar), castanets.',
     },
@@ -128,7 +128,7 @@ export const ACT_DEFINITIONS: ActDefinition[] = [
       foreground: 0x22d3ee,
     },
     audioConfig: {
-      scale: 'D_HARMONIC_MINOR',
+      scale: 'D_HUNGARIAN_MINOR',
       meter: '7/8_322',
       bpm: 126,
       description: 'Suspenseful Noir-Folk. Dissonant chords clashing with folk instruments.',
@@ -147,7 +147,7 @@ export const ACT_DEFINITIONS: ActDefinition[] = [
       foreground: 0xfef08a,
     },
     audioConfig: {
-      scale: 'D_PHRYGIAN_DOMINANT',
+      scale: 'D_FREYGISH',
       meter: '4/4',
       bpm: 180,
       description: 'Triumphant Full Ensemble. Major key modulation, 180 BPM czárdás finale.',

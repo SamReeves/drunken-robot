@@ -1,7 +1,7 @@
 import * as Tone from 'tone';
 import { BaseInstrument } from './BaseInstrument.ts';
 
-export type PercussionSoundType = 'castanet' | 'stomp' | 'shaker' | 'metal';
+export type PercussionSoundType = 'castanet' | 'stomp' | 'shaker' | 'metal' | 'jingle' | 'rim';
 
 export interface PercussionSynthParams {
   volume?: number;
@@ -19,6 +19,8 @@ export class PercussionSynth extends BaseInstrument {
   private readonly stompMembrane: Tone.MembraneSynth;
   private readonly shakerNoise: Tone.NoiseSynth;
   private readonly metalSynth: Tone.MetalSynth;
+  private readonly rimNoise: Tone.NoiseSynth;
+  private readonly rimFilter: Tone.Filter;
 
   constructor(params?: PercussionSynthParams) {
     super(params?.volume ?? 0);
@@ -63,6 +65,18 @@ export class PercussionSynth extends BaseInstrument {
     );
     this.metalSynth.frequency.value = 380;
 
+    // Rim / knock: a short bright click for footsteps
+    this.rimFilter = this.track(new Tone.Filter({ frequency: 1800, type: 'bandpass', Q: 3 }));
+    this.rimNoise = this.track(
+      new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
+        volume: -4,
+      }),
+    );
+    this.rimNoise.connect(this.rimFilter);
+    this.rimFilter.connect(this.output);
+
     this.castanetFilter.connect(this.output);
     this.stompMembrane.connect(this.output);
     this.shakerNoise.connect(this.output);
@@ -85,6 +99,10 @@ export class PercussionSynth extends BaseInstrument {
     this.metalSynth.triggerAttackRelease(380, '32n', time, velocity);
   }
 
+  public triggerRim(time?: Tone.Unit.Time, velocity = 0.3): void {
+    this.rimNoise.triggerAttackRelease('64n', time, velocity);
+  }
+
   public trigger(type: PercussionSoundType, time?: Tone.Unit.Time, velocity?: number): void {
     switch (type) {
       case 'castanet':
@@ -97,7 +115,11 @@ export class PercussionSynth extends BaseInstrument {
         this.triggerShaker(time, velocity);
         break;
       case 'metal':
+      case 'jingle':
         this.triggerMetal(time, velocity);
+        break;
+      case 'rim':
+        this.triggerRim(time, velocity);
         break;
     }
   }

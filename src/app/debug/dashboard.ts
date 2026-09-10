@@ -1,6 +1,8 @@
 import './dashboard.css';
 import { audioEngine } from '../../audio/engine.ts';
-import { SCALES, getScaleNotes, getTriadChord } from '../../audio/scales.ts';
+import { SCALES, getScaleNotes } from '../../audio/scales.ts';
+import { METERS } from '../../audio/theory/meter.ts';
+import { MODES } from '../../audio/theory/modes.ts';
 import type {
   ConductorStepEvent,
   EnsemblePreset,
@@ -19,7 +21,7 @@ import type { AudioBridge } from '../audioBridge.ts';
  * conductor/mixer directly for auditioning. Toggle with the backtick key.
  */
 
-const TEMPLATE = `
+const TEMPLATE = (): string => `
 <div class="sidebar-inner">
   <header class="app-header">
     <div class="header-badge">Debug • Audio Studio</div>
@@ -56,10 +58,9 @@ const TEMPLATE = `
       <div class="meter-control">
         <span class="label">Time Signature / Meter</span>
         <div class="button-group" role="radiogroup" aria-label="Meter Selection">
-          <button class="btn btn-toggle" data-meter="4/4">4/4 Czárdás</button>
-          <button class="btn btn-toggle" data-meter="7/8_322">7/8 (3+2+2)</button>
-          <button class="btn btn-toggle" data-meter="7/8_223">7/8 (2+2+3)</button>
-          <button class="btn btn-toggle" data-meter="ALTERNATING">4/4 ↔ 7/8</button>
+          ${Object.values(METERS)
+            .map((m) => `<button class="btn btn-toggle" data-meter="${m.name}">${m.label}</button>`)
+            .join('')}
         </div>
       </div>
     </section>
@@ -77,8 +78,12 @@ const TEMPLATE = `
     <section class="card scale-card">
       <h2>Modal Scales &amp; Harmony</h2>
       <div class="scale-selectors">
-        <button class="btn btn-toggle" data-scale="D_PHRYGIAN_DOMINANT">D Phrygian Dom</button>
-        <button class="btn btn-toggle" data-scale="D_HARMONIC_MINOR">D Harm Minor</button>
+        ${Object.values(MODES)
+          .map(
+            (m) =>
+              `<button class="btn btn-toggle" data-scale="${m.name}">${m.displayName.replace('D ', '')}</button>`,
+          )
+          .join('')}
       </div>
       <p id="scale-description" class="scale-desc"></p>
     </section>
@@ -132,13 +137,13 @@ function q<T extends Element>(root: ParentNode, selector: string): T {
 }
 
 export function mountDashboard(bridge: AudioBridge): void {
-  const { mixer, conductor } = bridge;
-  const { accordion, bass, percussion, guitar, violin, clarinet } = conductor;
+  const { mixer, director } = bridge;
+  const { accordion } = director;
 
   const aside = document.createElement('aside');
   aside.id = 'debug-dashboard';
   aside.className = 'sidebar';
-  aside.innerHTML = TEMPLATE;
+  aside.innerHTML = TEMPLATE();
   document.body.appendChild(aside);
 
   const statusBadge = q<HTMLSpanElement>(aside, '#audio-status-badge');
@@ -194,15 +199,16 @@ export function mountDashboard(bridge: AudioBridge): void {
   };
   btnPlay.addEventListener('click', () => {
     store.setPaused(false);
-    void conductor.start().then(() => showPlaying(true));
+    director.start();
+    showPlaying(true);
   });
   btnPause.addEventListener('click', () => {
     store.setPaused(true);
-    conductor.pause();
+    director.pause();
     showPlaying(false);
   });
   btnStop.addEventListener('click', () => {
-    conductor.stop();
+    director.stop();
     resetLeds();
     measureDisplay.textContent = 'Measure: 0';
     lastNoteDisplay.textContent = 'Last: -';
@@ -210,7 +216,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   bpmSlider.addEventListener('input', () => {
     const bpm = Number(bpmSlider.value);
     bpmVal.textContent = `${bpm} BPM`;
-    conductor.setBpm(bpm);
+    director.setBpm(bpm);
   });
   const syncBpm = (bpm: number): void => {
     bpmSlider.value = String(bpm);
@@ -220,8 +226,9 @@ export function mountDashboard(bridge: AudioBridge): void {
   // Meter
   function updateMeterLeds(meter: MeterType): void {
     beatLedStrip.innerHTML = '';
-    const total = meter === '4/4' ? 8 : 7;
-    const accents = meter === '4/4' ? [0, 4] : meter === '7/8_223' ? [0, 2, 4] : [0, 3, 5];
+    const def = METERS[meter];
+    const total = def.steps;
+    const accents = def.accents;
     for (let i = 0; i < total; i++) {
       const node = document.createElement('div');
       node.className = `led-node${accents.includes(i) ? ' accent' : ''}`;
@@ -244,7 +251,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   meterBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       const meter = btn.dataset.meter as MeterType;
-      conductor.setMeter(meter);
+      director.setMeter(meter);
       syncMeter(meter);
     });
   });
@@ -292,7 +299,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   scaleBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       const scale = btn.dataset.scale as ScaleName;
-      conductor.setScale(scale);
+      director.setScale(scale);
       syncScale(scale);
     });
   });
@@ -314,28 +321,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   }
 
   function auditionInstrument(id: InstrumentId): void {
-    const scale = conductor.scale;
-    switch (id) {
-      case 'accordion':
-        accordion.triggerAttackRelease(getTriadChord(scale, 1, 4), '4n', undefined, 0.85);
-        break;
-      case 'bass':
-        bass.triggerAttackRelease('D2', '4n', undefined, 0.95);
-        break;
-      case 'percussion':
-        percussion.triggerStomp(undefined, 0.95);
-        percussion.triggerCastanet(undefined, 0.85);
-        break;
-      case 'guitar':
-        guitar.strumChord(getTriadChord(scale, 1, 3), undefined, 'down', 0.018, '4n');
-        break;
-      case 'violin':
-        violin.triggerAttackRelease(scale === 'D_PHRYGIAN_DOMINANT' ? 'F#5' : 'F5', '2n', undefined, 0.9);
-        break;
-      case 'clarinet':
-        clarinet.triggerKrekhts('D5', undefined, '4n');
-        break;
-    }
+    director.audition(id);
     flashChannelLed(id);
   }
 
@@ -465,7 +451,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   });
 
   // Conductor step readout
-  conductor.onStep((event: ConductorStepEvent) => {
+  director.onStep((event: ConductorStepEvent) => {
     measureDisplay.textContent = `Measure: ${event.measureCount + 1}`;
     meterDisplay.textContent = `Meter: ${event.meter} (${event.totalSteps}/8)`;
     if (event.note) lastNoteDisplay.textContent = `Last: ${event.note}`;
@@ -490,7 +476,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   eventBus.on('PLAYER_LAND', () => flashChannelLed('percussion'));
   eventBus.on('PLAYER_STUMBLE', () => {
     flashChannelLed('percussion');
-    syncMeter('ALTERNATING');
+    syncMeter('5/8_LURCH');
   });
   eventBus.on('TIER_CHANGE', (e) => {
     e.activeInstruments.forEach(flashChannelLed);
@@ -513,7 +499,7 @@ export function mountDashboard(bridge: AudioBridge): void {
   eventBus.on('GAME_PAUSE', (p) => showPlaying(!p.isPaused));
 
   // Initial state
-  syncMeter(conductor.meter);
-  syncScale(conductor.scale);
-  syncBpm(Math.round(conductor.getBpm()));
+  syncMeter(director.meter);
+  syncScale(director.scale);
+  syncBpm(Math.round(director.getBpm()));
 }
