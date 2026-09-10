@@ -617,11 +617,23 @@ export class MusicDirector {
     }
   }
 
+  /** The band trails off one instrument at a time over about a bar, then the bass drops. */
   private onGameOver(): void {
-    this.pause();
-    if (!audioEngine.isReady) return;
-    this.bass.triggerAttackRelease('D1', '2n', undefined, 0.9);
-    this.percussion.triggerStomp(undefined, 0.95);
+    if (!audioEngine.isReady) {
+      this.pause();
+      return;
+    }
+    const order: InstrumentId[] = ['clarinet', 'violin', 'guitar', 'percussion', 'accordion', 'bass'];
+    const now = Tone.now();
+    order.forEach((id, i) => {
+      this.mixer.fadeOut(id, now + i * 0.18, 0.35);
+    });
+    this.percussion.triggerStomp(now, 0.95);
+    this.bass.triggerAttackRelease('D1', '2n', now + 0.9, 0.9);
+    setTimeout(() => {
+      this.pause();
+      for (const id of order) this.mixer.restoreChannel(id);
+    }, 1800);
   }
 
   private onVictory(): void {

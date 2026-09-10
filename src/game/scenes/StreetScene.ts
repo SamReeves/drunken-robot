@@ -186,7 +186,9 @@ export class StreetScene extends Phaser.Scene {
 
     // Keep only the current and next midgrounds resident (each is a 2560x720 texture).
     ensureActTextures(this, act);
-    ensureActTextures(this, act + 1);
+    // Build the following act's midground a little later, off the transition frame,
+    // and free the previous one once the tint tween has finished.
+    this.time.delayedCall(1200, () => ensureActTextures(this, act + 1));
     this.time.delayedCall(3000, () => releaseActTextures(this, act - 1));
 
     this.layers.find((l) => l.name === 'midground')?.tileSprite.setTexture(`bg_midground_act${act}`);

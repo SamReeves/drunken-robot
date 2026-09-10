@@ -64,11 +64,11 @@ export const ACT_DEFINITIONS: ActDefinition[] = [
     subtitle: 'Steamy windows & rainy cobblestones',
     minDistance: ACT_MIN_DISTANCE[0],
     visualPalette: {
-      sky: 0xffffff,
-      distant: 0xffffff,
-      midground: 0xffffff,
-      street: 0xffffff,
-      foreground: 0xffffff,
+      sky: 0xd9c4a8, // soot-warmed night
+      distant: 0xc9a26b, // burnt sienna haze
+      midground: 0xf2c98a, // deep amber lamplight
+      street: 0xe8d7c0, // rain-slick cobbles
+      foreground: 0xf5d9a6, // amber mist
     },
     audioConfig: {
       scale: 'D_FREYGISH',

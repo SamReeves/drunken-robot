@@ -58,15 +58,15 @@ The robot's journey progresses through five distinct zones, each shifting the vi
 
 ## 7. Toolchain & Workspace
 
-- **Engine / Frontend:** Phaser 4, Tone.js, Vite.
-- **Documentation:** Mintlify (Docs-as-code), Repomix (context packing for LLMs).
-- **Art:** Krita (painting), LDtk (level design), Free Tex Packer (spritesheets).
-- **Audio:** Audacity (trimming), Polyphone (SoundFonts), MuseScore (MIDI sequencing).
-- **Version Control & Deploy:** Git on GitHub; `deploy.yml` builds `main` and publishes to the `deploy` branch, served by DigitalOcean App Platform.
+- **Engine / Frontend:** Phaser 4, Tone.js 15, Vite 8, TypeScript.
+- **Quality:** ESLint (type-checked), Prettier, Vitest (theory, composer, economy, spawner, sway, store), Playwright end-to-end.
+- **Art & Audio:** everything is procedural in code; there are no image or sample assets.
+- **Version Control & Deploy:** Git on GitHub; `deploy.yml` builds `main` and publishes to the `deploy` branch, served by DigitalOcean App Platform at https://drunkenrobot.whalegames.net.
 
-## 8. Development Roadmap
+## 8. Where things live
 
-- **Phase 1: Audio Core & Procedural Engine** (Tone.js transport clock, procedural accordion, modal quantizers).
-- **Phase 2: Game Engine & Mechanical Stumble** (Phaser 4 canvas, parallax layers, wobbly physics controller).
-- **Phase 3: Audio-Gameplay Bridge & Busking Economy** (EventBus coupling, tip collection, ensemble recruitment UI).
-- **Phase 4: Polish, Narrative Flair, & Deployment** (Act biomes, asset integration, performance profiling, CI/CD).
+- `src/audio/theory` modes, chords, meters, progressions; `src/audio/composer` melody, rhythm cells, ornaments, humanization; `src/audio/arrangement` who plays what; `src/audio/scheduling` tick-based bar scheduler; `src/audio/director.ts` game events to music.
+- `src/game/balance.ts` every gameplay number; `src/game/systems` seeded RNG, economy, spawner, sway, input; `src/game/art` procedural textures; `src/game/scenes` Boot, Title, Street, Hud, Pause, End.
+- `src/state` store and event bus; `src/app` composition root, flags, audio bridge, `?debug=1` studio.
+
+See `README.md` for how to play and how to run it.

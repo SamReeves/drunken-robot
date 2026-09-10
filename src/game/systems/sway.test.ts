@@ -7,13 +7,19 @@ describe('noise1d', () => {
   it('stays within [-1, 1] and is continuous', () => {
     const n = noise1d(11);
     let prev = n(0);
+    let min = Infinity;
+    let max = -Infinity;
+    let maxJump = 0;
     for (let t = 0; t < 200; t += 0.001) {
       const v = n(t);
-      expect(v).toBeGreaterThanOrEqual(-1);
-      expect(v).toBeLessThanOrEqual(1);
-      expect(Math.abs(v - prev)).toBeLessThan(0.02);
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+      maxJump = Math.max(maxJump, Math.abs(v - prev));
       prev = v;
     }
+    expect(min).toBeGreaterThanOrEqual(-1);
+    expect(max).toBeLessThanOrEqual(1);
+    expect(maxJump).toBeLessThan(0.02);
   });
 
   it('is deterministic per seed', () => {

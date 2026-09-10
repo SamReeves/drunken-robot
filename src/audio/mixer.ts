@@ -276,6 +276,20 @@ export class EnsembleMixer {
     };
   }
 
+  /** Ramps a channel to silence starting at an audio-context time. */
+  public fadeOut(id: InstrumentId, startTime: number, seconds: number): void {
+    const channel = this.channels.get(id);
+    if (!channel) return;
+    channel.muteGain.gain.cancelScheduledValues(startTime);
+    channel.muteGain.gain.setValueAtTime(channel.muteGain.gain.value, startTime);
+    channel.muteGain.gain.linearRampToValueAtTime(0, startTime + seconds);
+  }
+
+  /** Puts a channel back to whatever its recruit/mute state says. */
+  public restoreChannel(id: InstrumentId): void {
+    this.updateChannelGains(id);
+  }
+
   private updateChannelGains(id: InstrumentId): void {
     const channel = this.channels.get(id);
     if (!channel) return;
