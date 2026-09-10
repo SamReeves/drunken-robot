@@ -3,6 +3,13 @@ import { Robot, type RobotContext, type RobotInputs } from '../entities/Robot.ts
 import { store } from '../../state/store.ts';
 import { eventBus, type BuffType } from '../../state/eventBus.ts';
 import { ensureActTextures, releaseActTextures } from '../art/textureFactory.ts';
+import {
+  HUD_REGISTRY_KEY,
+  SceneKeys,
+  type EndSceneData,
+  type HudTelemetry,
+  type RunOutcome,
+} from './keys.ts';
 
 interface ParallaxLayer {
   name: 'sky' | 'distant' | 'midground' | 'street' | 'foreground';
@@ -11,15 +18,13 @@ interface ParallaxLayer {
   currentTint: number;
 }
 
+/**
+ * StreetScene - the run itself: parallax world, robot, spawner, collisions.
+ * Readouts live in HudScene, the pause menu in PauseScene, and both outcomes
+ * in EndScene, so this scene only owns the world.
+ */
 export class StreetScene extends Phaser.Scene {
-  private layers: ParallaxLayer[] = [];
-  private robot!: Robot;
-  private groundPlatform!: Phaser.GameObjects.Rectangle;
-
-  // Object Pools & Groups
-  private tipsGroup!: Phaser.Physics.Arcade.Group;
-  private hazardsGroup!: Phaser.Physics.Arcade.Group;
-  private powerupsGroup!: Phaser.Physics.Arcade.Group;
+  private static readonly GROUND_Y = 584;
   private static readonly POWERUP_INITIAL_DELAY_MS = 8000;
   private static readonly POWERUP_RETRY_DELAY_MS = 2500;
   private static readonly POWERUP_MIN_INTERVAL_MS = 14000;
@@ -31,399 +36,168 @@ export class StreetScene extends Phaser.Scene {
     puddle: { width: 52, height: 14, y: 576 },
   } as const;
 
+  private layers: ParallaxLayer[] = [];
+  private robot!: Robot;
+  private groundPlatform!: Phaser.GameObjects.Rectangle;
+  private tipsGroup!: Phaser.Physics.Arcade.Group;
+  private hazardsGroup!: Phaser.Physics.Arcade.Group;
+  private powerupsGroup!: Phaser.Physics.Arcade.Group;
   private nextSpawnX = 750;
-  /** Countdown (ms) until the next power-up roll. Scene-relative, so restarts behave. */
   private powerupCooldownMs = StreetScene.POWERUP_INITIAL_DELAY_MS;
 
-  // Keyboard Inputs
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA?: Phaser.Input.Keyboard.Key;
   private keyD?: Phaser.Input.Keyboard.Key;
   private keyW?: Phaser.Input.Keyboard.Key;
   private keySpace?: Phaser.Input.Keyboard.Key;
-
-  // HUD Elements
-  private hudBellowsBar!: Phaser.GameObjects.Graphics;
-  private hudBalanceGauge!: Phaser.GameObjects.Graphics;
-  private hudProgressionGfx!: Phaser.GameObjects.Graphics;
-  private actBadgeBg!: Phaser.GameObjects.Graphics;
-  private actBadgeText!: Phaser.GameObjects.Text;
-  private activeBuffBadgeBg!: Phaser.GameObjects.Graphics;
-  private activeBuffBadgeText!: Phaser.GameObjects.Text;
-  private bannerContainer!: Phaser.GameObjects.Container;
-  private bannerBg!: Phaser.GameObjects.Graphics;
-  private bannerTitleText!: Phaser.GameObjects.Text;
-  private bannerSubText!: Phaser.GameObjects.Text;
-  private statusText!: Phaser.GameObjects.Text;
-  private tipsText!: Phaser.GameObjects.Text;
-  private momentumText!: Phaser.GameObjects.Text;
-
-  private isGameOver = false;
-  private isVictory = false;
-  private isPaused = false;
-  private hasAutoCollapsedSidebar = false;
-  private restartRequested = false;
-  private unsubActChange?: () => void;
-  private unsubGameOver?: () => void;
-  private unsubVictory?: () => void;
-  private unsubGamePause?: () => void;
-  private gameOverOverlay?: Phaser.GameObjects.Container;
-  private pauseOverlay?: Phaser.GameObjects.Container;
   private keyP?: Phaser.Input.Keyboard.Key;
   private keyEsc?: Phaser.Input.Keyboard.Key;
 
+  private isRunOver = false;
+  private isPaused = false;
+  private restartRequested = false;
+  private unsubscribers: Array<() => void> = [];
+
   constructor() {
-    super({ key: 'StreetScene' });
+    super({ key: SceneKeys.Street });
   }
 
   create(): void {
     const { width, height } = this.scale;
     this.layers = [];
     this.nextSpawnX = 750;
-    this.isGameOver = false;
-    this.isVictory = false;
-    this.isPaused = store.isPaused();
-    this.hasAutoCollapsedSidebar = false;
+    this.isRunOver = false;
+    this.isPaused = false;
     this.restartRequested = false;
     this.powerupCooldownMs = StreetScene.POWERUP_INITIAL_DELAY_MS;
 
-    // Tear down anything left from a previous run of this scene *before* registering
-    // new listeners; doing it afterwards silently removed the P/ESC pause handlers.
+    // Tear down anything left from a previous run *before* registering new listeners.
     this.cleanupListeners();
     this.physics.resume();
 
-    // 1. Create Parallax Layers pinned to camera viewport (setScrollFactor(0))
-    const skyLayer = this.add.tileSprite(0, 0, width, height, 'bg_sky').setOrigin(0, 0).setScrollFactor(0);
-    this.layers.push({ name: 'sky', tileSprite: skyLayer, scrollSpeedFactor: 0.1, currentTint: 0xffffff });
-
-    const distantLayer = this.add
-      .tileSprite(0, 0, width, height, 'bg_distant')
-      .setOrigin(0, 0)
-      .setScrollFactor(0);
-    this.layers.push({
-      name: 'distant',
-      tileSprite: distantLayer,
-      scrollSpeedFactor: 0.25,
-      currentTint: 0xffffff,
-    });
-
+    // 1. Parallax layers pinned to the camera
     const initialAct = store.getState().activeAct || 1;
-    // A restart can land on an act whose midground was released; rebuild what this run needs.
     ensureActTextures(this, initialAct);
     ensureActTextures(this, initialAct + 1);
-    const midLayer = this.add
-      .tileSprite(0, 0, width, height, `bg_midground_act${initialAct}`)
-      .setOrigin(0, 0)
-      .setScrollFactor(0);
-    this.layers.push({
-      name: 'midground',
-      tileSprite: midLayer,
-      scrollSpeedFactor: 0.55,
-      currentTint: 0xffffff,
-    });
+    const addLayer = (name: ParallaxLayer['name'], key: string, factor: number): void => {
+      const tileSprite = this.add.tileSprite(0, 0, width, height, key).setOrigin(0, 0).setScrollFactor(0);
+      this.layers.push({ name, tileSprite, scrollSpeedFactor: factor, currentTint: 0xffffff });
+    };
+    addLayer('sky', 'bg_sky', 0.1);
+    addLayer('distant', 'bg_distant', 0.25);
+    addLayer('midground', `bg_midground_act${initialAct}`, 0.55);
+    addLayer('street', 'bg_street', 1.0);
+    addLayer('foreground', 'bg_foreground', 1.25);
 
-    const streetLayer = this.add
-      .tileSprite(0, 0, width, height, 'bg_street')
-      .setOrigin(0, 0)
-      .setScrollFactor(0);
-    this.layers.push({
-      name: 'street',
-      tileSprite: streetLayer,
-      scrollSpeedFactor: 1.0,
-      currentTint: 0xffffff,
-    });
-
-    const fgLayer = this.add
-      .tileSprite(0, 0, width, height, 'bg_foreground')
-      .setOrigin(0, 0)
-      .setScrollFactor(0);
-    this.layers.push({
-      name: 'foreground',
-      tileSprite: fgLayer,
-      scrollSpeedFactor: 1.25,
-      currentTint: 0xffffff,
-    });
-
-    // 2. Create Static Cobblestone Ground Platform (Aligned to curb/street baseline at y = 584)
-    this.groundPlatform = this.add.rectangle(0, 584, 500000, 60, 0x000000, 0);
-    this.groundPlatform.setOrigin(0, 0);
+    // 2. Ground platform at the curb baseline
+    this.groundPlatform = this.add
+      .rectangle(0, StreetScene.GROUND_Y, 500000, 60, 0x000000, 0)
+      .setOrigin(0, 0);
     this.physics.add.existing(this.groundPlatform, true);
 
-    // 3. Object Groups for Tips, Hazards & Power-Ups
-    this.tipsGroup = this.physics.add.group({
-      allowGravity: false,
-      immovable: true,
-    });
+    // 3. Object groups
+    const groupConfig = { allowGravity: false, immovable: true };
+    this.tipsGroup = this.physics.add.group(groupConfig);
+    this.hazardsGroup = this.physics.add.group(groupConfig);
+    this.powerupsGroup = this.physics.add.group(groupConfig);
 
-    this.hazardsGroup = this.physics.add.group({
-      allowGravity: false,
-      immovable: true,
-    });
-
-    this.powerupsGroup = this.physics.add.group({
-      allowGravity: false,
-      immovable: true,
-    });
-
-    // 4. Instantiate Robot Arcade Physics Entity
+    // 4. Robot
     this.robot = new Robot(this, 320, 520);
     this.physics.add.collider(this.robot, this.groundPlatform);
-
-    // 5. Overlap Handlers (Collecting Tips, Hitting Hazards & Power-Ups)
-    this.physics.add.overlap(this.robot, this.tipsGroup, (_robot, obj) =>
+    this.physics.add.overlap(this.robot, this.tipsGroup, (_r, obj) =>
       this.handleCollectTip(obj as Phaser.Physics.Arcade.Sprite),
     );
-    this.physics.add.overlap(this.robot, this.hazardsGroup, (_robot, obj) =>
+    this.physics.add.overlap(this.robot, this.hazardsGroup, (_r, obj) =>
       this.handleHitHazard(obj as Phaser.Physics.Arcade.Sprite),
     );
-    this.physics.add.overlap(this.robot, this.powerupsGroup, (_robot, obj) =>
+    this.physics.add.overlap(this.robot, this.powerupsGroup, (_r, obj) =>
       this.handleCollectPowerup(obj as Phaser.Physics.Arcade.Sprite),
     );
 
-    // 6. Smooth Camera Tracking & Vertical Axis Lock
+    // 5. Camera
     this.cameras.main.startFollow(this.robot, true, 0.08, 0.08, -140, 50);
     this.cameras.main.setBounds(0, 0, Number.MAX_SAFE_INTEGER, 720);
 
-    // 7. Setup Keyboard Input Controls (A/D/Left/Right/Space/P/ESC)
+    // 6. Input
     this.setupInputControls();
 
-    // 8. Setup Interactive HUD / Overlay UI & Act Banners
-    this.setupOverlayUI(width);
-
-    // 9. Register EventBus Listeners
-    this.unsubActChange = eventBus.on('ACT_CHANGE', (payload) => {
-      this.handleActTransition(payload.act, payload.name);
+    // 7. Bus listeners
+    this.unsubscribers = [
+      eventBus.on('ACT_CHANGE', (p) => this.handleActTransition(p.act)),
+      eventBus.on('GAME_OVER', () => this.handleGameOver()),
+      eventBus.on('VICTORY', () => this.handleVictory()),
+      eventBus.on('GAME_PAUSE', (p) => this.handlePauseChange(p.isPaused)),
+    ];
+    this.events.once('shutdown', () => {
+      this.cleanupListeners();
+      this.scene.stop(SceneKeys.Hud);
+      this.scene.stop(SceneKeys.Pause);
     });
 
-    this.unsubGameOver = eventBus.on('GAME_OVER', (payload) => {
-      this.handleGameOver(payload.distanceTraveled, payload.tips);
-    });
+    this.applyInstantActPalette(initialAct);
 
-    this.unsubVictory = eventBus.on('VICTORY', () => {
-      this.handleVictory();
-    });
-
-    this.unsubGamePause = eventBus.on('GAME_PAUSE', (payload) => {
-      this.handlePauseChange(payload.isPaused);
-    });
-
-    this.events.once('shutdown', () => this.cleanupListeners());
-    this.events.once('destroy', () => this.cleanupListeners());
-
-    // Apply initial act visual state
-    const currentActDef = store.getCurrentActDefinition();
-    this.applyInstantActPalette(currentActDef.act);
-
-    if (this.isPaused) {
-      this.handlePauseChange(true);
-    }
+    // 8. Readouts live in their own scene on top of this one
+    this.scene.launch(SceneKeys.Hud);
   }
 
   private setupInputControls(): void {
-    if (this.input.keyboard) {
-      this.cursors = this.input.keyboard.createCursorKeys();
-      this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-      this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-      this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-      this.keyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
-      this.keyEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-
-      this.keyP.on('down', () => this.togglePause());
-      this.keyEsc.on('down', () => this.togglePause());
-    }
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+    this.cursors = keyboard.createCursorKeys();
+    this.keyA = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.keyD = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.keyW = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.keySpace = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.keyP = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+    this.keyEsc = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.keyP.on('down', () => this.togglePause());
+    this.keyEsc.on('down', () => this.togglePause());
   }
 
-  private setupOverlayUI(width: number): void {
-    // Act & Busking Progression Badge (Top Left)
-    this.actBadgeBg = this.add.graphics().setScrollFactor(0);
-    this.drawBadgeBg(0xf59e0b);
-
-    const initialAct = store.getCurrentActDefinition();
-    this.actBadgeText = this.add
-      .text(32, 28, `ACT ${initialAct.act}: ${initialAct.name.toUpperCase()}`, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        color: '#f59e0b',
-        fontStyle: 'bold',
-      })
-      .setScrollFactor(0);
-
-    // Live Tips & Momentum HUD labels
-    this.tipsText = this.add
-      .text(32, 48, '⚙️ Tips: 0', {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#fbbf24',
-        fontStyle: 'bold',
-      })
-      .setScrollFactor(0);
-
-    this.momentumText = this.add
-      .text(140, 48, '⚡ Momentum: 0% [Solo]', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#9ca3af',
-      })
-      .setScrollFactor(0);
-
-    // Cinematic Center-Screen Act Transition Banner
-    this.bannerContainer = this.add
-      .container(width / 2, 240)
-      .setScrollFactor(0)
-      .setAlpha(0)
-      .setDepth(100);
-    this.bannerBg = this.add.graphics();
-    this.bannerBg.fillStyle(0x090a0f, 0.92);
-    this.bannerBg.lineStyle(2, 0xf59e0b, 0.95);
-    this.bannerBg.fillRoundedRect(-240, -45, 480, 90, 10);
-    this.bannerBg.strokeRoundedRect(-240, -45, 480, 90, 10);
-
-    this.bannerTitleText = this.add
-      .text(0, -18, '', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '19px',
-        color: '#fef08a',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0.5);
-
-    this.bannerSubText = this.add
-      .text(0, 14, '', {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#9ca3af',
-      })
-      .setOrigin(0.5, 0.5);
-
-    this.bannerContainer.add([this.bannerBg, this.bannerTitleText, this.bannerSubText]);
-
-    // Right Control Guide HUD
-    this.statusText = this.add
-      .text(width - 20, 20, 'A / D (← / →) : Balance Torque | Hold Space : Accordion Jump', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#d1d5db',
-        backgroundColor: 'rgba(18, 19, 22, 0.88)',
-        padding: { x: 12, y: 7 },
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
-
-    // Dynamic Gauges Container (Pinned top right below guide)
-    this.hudBellowsBar = this.add.graphics().setScrollFactor(0);
-    this.hudBalanceGauge = this.add.graphics().setScrollFactor(0);
-    this.hudProgressionGfx = this.add.graphics().setScrollFactor(0);
-
-    // Active Buff Indicator HUD Badge
-    this.activeBuffBadgeBg = this.add.graphics().setScrollFactor(0);
-    this.activeBuffBadgeText = this.add
-      .text(32, 100, '', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#ffffff',
-        fontStyle: 'bold',
-      })
-      .setScrollFactor(0);
-  }
-
-  private drawBadgeBg(strokeColor: number): void {
-    this.actBadgeBg.clear();
-    this.actBadgeBg.fillStyle(0x121316, 0.92);
-    this.actBadgeBg.lineStyle(1, strokeColor, 0.85);
-    this.actBadgeBg.fillRoundedRect(20, 20, 320, 68, 8);
-    this.actBadgeBg.strokeRoundedRect(20, 20, 320, 68, 8);
-  }
+  // ---------------------------------------------------------------
+  // Acts and palette
+  // ---------------------------------------------------------------
 
   private applyInstantActPalette(act: number): void {
     const actDef = store.getActDefinition(act);
-    if (!actDef) return;
-
-    // Hot-swap midground architecture texture key for active Act
-    const midLayer = this.layers.find((l) => l.name === 'midground');
-    if (midLayer) {
-      midLayer.tileSprite.setTexture(`bg_midground_act${act}`);
-    }
-
+    this.layers.find((l) => l.name === 'midground')?.tileSprite.setTexture(`bg_midground_act${act}`);
     for (const layer of this.layers) {
-      const tintHex = actDef.visualPalette[layer.name] ?? 0xffffff;
-      layer.tileSprite.setTint(tintHex);
-      layer.currentTint = tintHex;
+      const tint = actDef.visualPalette[layer.name] ?? 0xffffff;
+      layer.tileSprite.setTint(tint);
+      layer.currentTint = tint;
     }
   }
 
-  private handleActTransition(act: number, name: string): void {
+  private handleActTransition(act: number): void {
     const actDef = store.getActDefinition(act);
-    if (!actDef) return;
 
     // Keep only the current and next midgrounds resident (each is a 2560x720 texture).
     ensureActTextures(this, act);
     ensureActTextures(this, act + 1);
     this.time.delayedCall(3000, () => releaseActTextures(this, act - 1));
 
-    // Hot-swap midground architecture texture key to match the new Act
-    const midLayer = this.layers.find((l) => l.name === 'midground');
-    if (midLayer) {
-      midLayer.tileSprite.setTexture(`bg_midground_act${act}`);
-    }
-
-    // 1. Update Act Badge Text and Pulse Animation
-    if (this.actBadgeText) {
-      this.actBadgeText.setText(`ACT ${act}: ${name.toUpperCase()}`);
-      this.tweens.add({
-        targets: this.actBadgeText,
-        scaleX: 1.12,
-        scaleY: 1.12,
-        duration: 200,
-        yoyo: true,
-        ease: 'Quad.easeInOut',
-      });
-      this.drawBadgeBg(0xfbbf24);
-      this.time.delayedCall(800, () => this.drawBadgeBg(0xf59e0b));
-    }
-
-    // 2. Cinematic Center Banner Announcement
-    if (this.bannerContainer && this.bannerTitleText && this.bannerSubText) {
-      this.bannerTitleText.setText(`ACT ${act}: ${name.toUpperCase()}`);
-      this.bannerSubText.setText(actDef.subtitle);
-      this.bannerContainer.setY(220);
-
-      this.tweens.killTweensOf(this.bannerContainer);
-      this.tweens.add({
-        targets: this.bannerContainer,
-        alpha: { from: 0, to: 1 },
-        y: 240,
-        duration: 450,
-        ease: 'Cubic.easeOut',
-        hold: 2000,
-        yoyo: true,
-      });
-    }
-
-    // 3. Smooth Parallax Tint Tweens across all 5 layers
-    const targetPalette = actDef.visualPalette;
+    this.layers.find((l) => l.name === 'midground')?.tileSprite.setTexture(`bg_midground_act${act}`);
 
     for (const layer of this.layers) {
       const fromColor = Phaser.Display.Color.ValueToColor(layer.currentTint);
-      const targetHex = targetPalette[layer.name] ?? 0xffffff;
+      const targetHex = actDef.visualPalette[layer.name] ?? 0xffffff;
       const toColor = Phaser.Display.Color.ValueToColor(targetHex);
-
-      const colorTweenObj = { progress: 0 };
+      const progress = { t: 0 };
       this.tweens.add({
-        targets: colorTweenObj,
-        progress: 1,
+        targets: progress,
+        t: 1,
         duration: 2500,
         ease: 'Quad.easeInOut',
         onUpdate: () => {
-          const interpolated = Phaser.Display.Color.Interpolate.ColorWithColor(
+          const c = Phaser.Display.Color.Interpolate.ColorWithColor(
             fromColor,
             toColor,
             100,
-            Math.round(colorTweenObj.progress * 100),
+            Math.round(progress.t * 100),
           );
-          const currentHex = Phaser.Display.Color.GetColor(interpolated.r, interpolated.g, interpolated.b);
-          layer.tileSprite.setTint(currentHex);
-          layer.currentTint = currentHex;
+          const hex = Phaser.Display.Color.GetColor(c.r, c.g, c.b);
+          layer.tileSprite.setTint(hex);
+          layer.currentTint = hex;
         },
         onComplete: () => {
           layer.tileSprite.setTint(targetHex);
@@ -433,9 +207,13 @@ export class StreetScene extends Phaser.Scene {
     }
   }
 
+  // ---------------------------------------------------------------
+  // Spawning
+  // ---------------------------------------------------------------
+
   private spawnObstaclesAndTips(): void {
-    const cameraLookAhead = this.robot.x + 950;
-    if (cameraLookAhead <= this.nextSpawnX) return;
+    const lookAhead = this.robot.x + 950;
+    if (lookAhead <= this.nextSpawnX) return;
 
     const spawnX = this.nextSpawnX;
     const scenario = Phaser.Math.Between(0, 3);
@@ -444,42 +222,34 @@ export class StreetScene extends Phaser.Scene {
     const puddleKey = `hazard_puddle_act${activeAct}`;
 
     switch (scenario) {
-      case 0: {
-        // Crate Hazard on Ground + Parabolic Tip Arc
+      case 0:
+        // Crate on the ground with a tip arc over it
         this.spawnHazard(spawnX, 'crate', crateKey);
-
-        // Tip Arc (3 gears)
         this.createTip(spawnX - 55, 510);
         this.createTip(spawnX, 450);
         this.createTip(spawnX + 55, 510);
         break;
-      }
-      case 1: {
-        // Murky Puddle Hazard + High Bonus Tip
+      case 1:
+        // Puddle with a high bonus tip
         this.spawnHazard(spawnX, 'puddle', puddleKey);
-
         this.createTip(spawnX, 465);
         this.createTip(spawnX + 70, 520);
         break;
-      }
-      case 2: {
-        // Ground Tip Run (3 consecutive tips)
+      case 2:
+        // Ground run of three tips
         this.createTip(spawnX, 545);
         this.createTip(spawnX + 45, 545);
         this.createTip(spawnX + 90, 545);
         break;
-      }
-      case 3: {
-        // Double Crate Hurdle (45px apart reads as one wide hurdle) + Jump Arc (4 tips)
+      case 3:
+        // Double crate hurdle (45 px apart reads as one wide hurdle) with a four-tip arc
         this.spawnHazard(spawnX, 'crate', crateKey);
         this.spawnHazard(spawnX + 45, 'crate', crateKey);
-
         this.createTip(spawnX - 25, 495);
         this.createTip(spawnX + 5, 435);
         this.createTip(spawnX + 40, 435);
         this.createTip(spawnX + 70, 495);
         break;
-      }
     }
 
     this.nextSpawnX += Phaser.Math.Between(360, 540);
@@ -494,18 +264,10 @@ export class StreetScene extends Phaser.Scene {
     return hazard;
   }
 
-  /** Destroys a pooled sprite and any tweens still targeting it (bobbing tips leaked otherwise). */
-  private destroyEntity(sprite: Phaser.GameObjects.GameObject): void {
-    this.tweens.killTweensOf(sprite);
-    sprite.destroy();
-  }
-
   private createTip(x: number, y: number): Phaser.Physics.Arcade.Sprite {
     const tip = this.tipsGroup.create(x, y, 'item_tip_gear') as Phaser.Physics.Arcade.Sprite;
     tip.setOrigin(0.5, 0.5);
-    (tip.body as Phaser.Physics.Arcade.Body)?.setSize(22, 22);
-
-    // Subtle floating bob animation
+    (tip.body as Phaser.Physics.Arcade.Body | null)?.setSize(22, 22);
     this.tweens.add({
       targets: tip,
       y: y - 6,
@@ -514,333 +276,13 @@ export class StreetScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-
     return tip;
   }
 
-  private handleCollectTip(tip: Phaser.Physics.Arcade.Sprite): void {
-    if (!tip.active) return;
-
-    const tx = tip.x;
-    const ty = tip.y;
-    tip.disableBody(true, true);
-    this.destroyEntity(tip);
-
-    store.addTips(1);
-
-    // Visual floating "+1 ⚙️" feedback
-    const floatText = this.add
-      .text(tx, ty - 10, '+1 ⚙️', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        color: '#fbbf24',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0.5);
-
-    this.tweens.add({
-      targets: floatText,
-      y: ty - 38,
-      alpha: 0,
-      duration: 600,
-      ease: 'Power1',
-      onComplete: () => floatText.destroy(),
-    });
-  }
-
-  private handleCollectPowerup(powerup: Phaser.Physics.Arcade.Sprite): void {
-    if (!powerup.active) return;
-
-    const px = powerup.x;
-    const py = powerup.y;
-    const buffType = powerup.getData('buffType') as BuffType;
-
-    powerup.disableBody(true, true);
-    this.destroyEntity(powerup);
-
-    store.activateBuff(buffType, StreetScene.BUFF_DURATION_SEC);
-
-    let indicator = 'POWER UP!';
-    let textColor = '#ffffff';
-
-    switch (buffType) {
-      case 'tips':
-        indicator = '2X TIPS! 🌻';
-        textColor = '#fbbf24';
-        break;
-      case 'balance':
-        indicator = '+50% STABILITY! 🍾';
-        textColor = '#34d399';
-        break;
-      case 'jump':
-        indicator = 'SUPER JUMP & SHIELD! ⚡';
-        textColor = '#38bdf8';
-        break;
-    }
-
-    // Floating text indicator
-    const floatText = this.add
-      .text(px, py - 15, indicator, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '15px',
-        color: textColor,
-        fontStyle: 'bold',
-        stroke: '#18181b',
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5, 0.5);
-
-    this.tweens.add({
-      targets: floatText,
-      y: py - 60,
-      alpha: 0,
-      duration: 900,
-      ease: 'Cubic.easeOut',
-      onComplete: () => floatText.destroy(),
-    });
-  }
-
-  private handleHitHazard(hazard: Phaser.Physics.Arcade.Sprite): void {
-    if (!hazard.active || hazard.getData('hit')) return;
-
-    // Super Jump & Hazard Invulnerability Buff Bypass
-    if (store.getState().activeBuff === 'jump') {
-      hazard.setData('hit', true);
-      const hx = hazard.x;
-      const hy = hazard.y;
-
-      // Shatter hazard with electric cyan energy
-      hazard.setTint(0x38bdf8);
-      this.tweens.add({
-        targets: hazard,
-        alpha: 0,
-        y: hy - 45,
-        angle: 75,
-        scaleX: 0.6,
-        scaleY: 0.6,
-        duration: 400,
-        ease: 'Cubic.easeIn',
-        onComplete: () => this.destroyEntity(hazard),
-      });
-
-      // Floating "SMASHED! ⚡" feedback indicator
-      const smashText = this.add
-        .text(hx, hy - 25, 'SMASHED! ⚡', {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '14px',
-          color: '#38bdf8',
-          fontStyle: 'bold',
-          stroke: '#082f49',
-          strokeThickness: 3,
-        })
-        .setOrigin(0.5, 0.5);
-
-      this.tweens.add({
-        targets: smashText,
-        y: hy - 58,
-        alpha: 0,
-        duration: 650,
-        ease: 'Power2',
-        onComplete: () => smashText.destroy(),
-      });
-
-      // Completely bypass stumble, camera shake, and momentum penalties!
-      return;
-    }
-
-    hazard.setData('hit', true);
-    hazard.setTint(0xef4444);
-
-    const hx = hazard.x;
-    const hy = hazard.y;
-    const hazardType = (hazard.getData('hazardType') as 'crate' | 'puddle') ?? 'crate';
-
-    this.robot.triggerStumble(0.85);
-    store.applyStumblePenalty();
-
-    this.cameras.main.shake(180, 0.005);
-
-    eventBus.emit('HAZARD_HIT', {
-      x: hx,
-      y: hy,
-      hazardType,
-    });
-
-    // Floating Stumble text indicator
-    const stumbleText = this.add
-      .text(hx, hy - 25, 'STUMBLE! ⚠️', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        color: '#ef4444',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0.5);
-
-    this.tweens.add({
-      targets: stumbleText,
-      y: hy - 50,
-      alpha: 0,
-      duration: 750,
-      ease: 'Power2',
-      onComplete: () => stumbleText.destroy(),
-    });
-  }
-
-  private recycleOffscreenEntities(): void {
-    const despawnX = this.cameras.main.scrollX - 250;
-
-    for (const group of [this.tipsGroup, this.hazardsGroup, this.powerupsGroup]) {
-      // Copy: destroying mutates the group's child list while iterating.
-      for (const child of [...group.getChildren()]) {
-        const sprite = child as Phaser.Physics.Arcade.Sprite;
-        if (sprite.x < despawnX) {
-          this.destroyEntity(sprite);
-        }
-      }
-    }
-  }
-
-  private updateHUD(width: number): void {
-    if (!this.robot) return;
-
-    const pressure = this.robot.getBellowsPressure();
-    const stabilityRatio = this.robot.getStabilityRatio();
-    const isStumbling = this.robot.getIsStumbling();
-    const wobbleAngle = this.robot.getWobbleAngle();
-    const gameState = store.getState();
-
-    // 1. Update Progression Info
-    this.tipsText.setText(`⚙️ Tips: ${gameState.tips}`);
-    this.momentumText.setText(
-      `⚡ ${Math.round(gameState.momentum)}% [T${gameState.momentumTier}: ${gameState.tierName}]`,
-    );
-
-    // Top-left momentum progress bar
-    this.hudProgressionGfx.clear();
-    const progX = 32;
-    const progY = 66;
-    const progW = 296;
-    const progH = 6;
-
-    this.hudProgressionGfx.fillStyle(0x18181b, 0.9);
-    this.hudProgressionGfx.fillRoundedRect(progX, progY, progW, progH, 2);
-
-    if (gameState.momentum > 0) {
-      const fillW = Math.max(4, progW * (gameState.momentum / 100));
-      const tierColor =
-        gameState.momentumTier >= 3 ? 0xa855f7 : gameState.momentumTier >= 1 ? 0xf59e0b : 0x10b981;
-      this.hudProgressionGfx.fillStyle(tierColor, 0.95);
-      this.hudProgressionGfx.fillRoundedRect(progX, progY, fillW, progH, 2);
-    }
-
-    // 2. Bellows Pressure Bar (Top Right)
-    this.hudBellowsBar.clear();
-    const barX = width - 260;
-    const barY = 56;
-    const barW = 240;
-    const barH = 14;
-
-    this.hudBellowsBar.fillStyle(0x18181b, 0.85);
-    this.hudBellowsBar.fillRoundedRect(barX, barY, barW, barH, 4);
-    this.hudBellowsBar.lineStyle(1, 0x3f3f46, 0.8);
-    this.hudBellowsBar.strokeRoundedRect(barX, barY, barW, barH, 4);
-
-    if (pressure > 0.01) {
-      const fillW = Math.max(4, (barW - 4) * pressure);
-      this.hudBellowsBar.fillStyle(0xf59e0b, 0.95);
-      this.hudBellowsBar.fillRoundedRect(barX + 2, barY + 2, fillW, barH - 4, 2);
-    }
-
-    // 3. Wobble Balance Gauge
-    this.hudBalanceGauge.clear();
-    const gaugeY = 76;
-
-    this.hudBalanceGauge.fillStyle(0x18181b, 0.85);
-    this.hudBalanceGauge.fillRoundedRect(barX, gaugeY, barW, 10, 3);
-    this.hudBalanceGauge.fillStyle(0x52525b, 0.8);
-    this.hudBalanceGauge.fillRect(barX + barW / 2 - 1, gaugeY, 2, 10);
-
-    const needleOffset = (wobbleAngle / this.robot.getDynamicStabilityThreshold()) * (barW / 2 - 8);
-    const needleX = Phaser.Math.Clamp(barX + barW / 2 + needleOffset, barX + 4, barX + barW - 4);
-    const needleColor = isStumbling ? 0xef4444 : stabilityRatio > 0.75 ? 0xf59e0b : 0x10b981;
-
-    this.hudBalanceGauge.fillStyle(needleColor, 1);
-    this.hudBalanceGauge.fillCircle(needleX, gaugeY + 5, 4);
-
-    // Status label text
-    if (isStumbling) {
-      this.statusText.setText('⚠️ STUMBLE! Rhythm Warped (Recovering...)');
-      this.statusText.setColor('#ef4444');
-    } else if (pressure > 0) {
-      this.statusText.setText(`💨 Charging Bellows: ${Math.round(pressure * 100)}% (Release Space to Jump)`);
-      this.statusText.setColor('#f59e0b');
-    } else {
-      this.statusText.setText('A / D (← / →) : Balance Torque | Hold Space : Accordion Jump');
-      this.statusText.setColor('#d1d5db');
-    }
-
-    // 4. Active Buff Indicator (Under Act Badge at top-left)
-    this.activeBuffBadgeBg.clear();
-    if (gameState.activeBuff && gameState.buffTimeRemaining > 0) {
-      const remainingSec = Math.ceil(gameState.buffTimeRemaining);
-      let buffTitle = '';
-      let badgeStroke = 0xf59e0b;
-      let badgeFill = 0x271900;
-      let textColor = '#fbbf24';
-
-      switch (gameState.activeBuff) {
-        case 'tips':
-          buffTitle = `🌻 2X TIPS (${remainingSec}s)`;
-          badgeStroke = 0xf59e0b;
-          badgeFill = 0x271900;
-          textColor = '#fbbf24';
-          break;
-        case 'balance':
-          buffTitle = `🍾 +50% STABILITY (${remainingSec}s)`;
-          badgeStroke = 0x10b981;
-          badgeFill = 0x022c22;
-          textColor = '#34d399';
-          break;
-        case 'jump':
-          buffTitle = `⚡ SUPER JUMP & SHIELD (${remainingSec}s)`;
-          badgeStroke = 0x06b6d4;
-          badgeFill = 0x082f49;
-          textColor = '#38bdf8';
-          break;
-      }
-
-      const badgeX = 20;
-      const badgeY = 96;
-      const badgeW = 220;
-      const badgeH = 26;
-
-      this.activeBuffBadgeBg.fillStyle(badgeFill, 0.92);
-      this.activeBuffBadgeBg.fillRoundedRect(badgeX, badgeY, badgeW, badgeH, 6);
-      this.activeBuffBadgeBg.lineStyle(1.5, badgeStroke, 0.9);
-      this.activeBuffBadgeBg.strokeRoundedRect(badgeX, badgeY, badgeW, badgeH, 6);
-
-      // Remaining duration bar beneath text
-      const progressRatio = Phaser.Math.Clamp(
-        gameState.buffTimeRemaining / (gameState.buffDuration || StreetScene.BUFF_DURATION_SEC),
-        0,
-        1,
-      );
-      this.activeBuffBadgeBg.fillStyle(badgeStroke, 0.7);
-      this.activeBuffBadgeBg.fillRoundedRect(
-        badgeX + 4,
-        badgeY + badgeH - 4,
-        (badgeW - 8) * progressRatio,
-        2,
-        1,
-      );
-
-      this.activeBuffBadgeText.setText(buffTitle);
-      this.activeBuffBadgeText.setColor(textColor);
-      this.activeBuffBadgeText.setPosition(badgeX + 10, badgeY + 6);
-      this.activeBuffBadgeText.setVisible(true);
-    } else {
-      this.activeBuffBadgeText.setVisible(false);
-    }
+  /** Destroys a pooled sprite and any tweens still targeting it. */
+  private destroyEntity(sprite: Phaser.GameObjects.GameObject): void {
+    this.tweens.killTweensOf(sprite);
+    sprite.destroy();
   }
 
   private spawnFloatingPowerups(delta: number): void {
@@ -851,113 +293,200 @@ export class StreetScene extends Phaser.Scene {
       this.powerupCooldownMs = StreetScene.POWERUP_RETRY_DELAY_MS;
       return;
     }
-
     this.powerupCooldownMs = Phaser.Math.Between(
       StreetScene.POWERUP_MIN_INTERVAL_MS,
       StreetScene.POWERUP_MAX_INTERVAL_MS,
     );
 
-    const cameraRightEdge = this.cameras.main.scrollX + this.scale.width + 60;
+    const spawnX = this.cameras.main.scrollX + this.scale.width + 60;
     const baseY = Phaser.Math.Between(410, 490);
-
     const buffTypes: BuffType[] = ['tips', 'balance', 'jump'];
-    const selectedBuff = Phaser.Utils.Array.GetRandom(buffTypes);
+    const buff = Phaser.Utils.Array.GetRandom(buffTypes);
+    const textureKey =
+      buff === 'balance' ? 'powerup_brandy' : buff === 'jump' ? 'powerup_steam' : 'powerup_sunflower';
 
-    let textureKey = 'powerup_sunflower';
-    if (selectedBuff === 'balance') textureKey = 'powerup_brandy';
-    else if (selectedBuff === 'jump') textureKey = 'powerup_steam';
-
-    const powerup = this.powerupsGroup.create(
-      cameraRightEdge,
-      baseY,
-      textureKey,
-    ) as Phaser.Physics.Arcade.Sprite;
+    const powerup = this.powerupsGroup.create(spawnX, baseY, textureKey) as Phaser.Physics.Arcade.Sprite;
     powerup.setOrigin(0.5, 0.5);
-    (powerup.body as Phaser.Physics.Arcade.Body)?.setSize(28, 28);
-    powerup.setData('buffType', selectedBuff);
+    (powerup.body as Phaser.Physics.Arcade.Body | null)?.setSize(28, 28);
+    powerup.setData('buffType', buff);
     powerup.setData('baseY', baseY);
     powerup.setData('phaseOffset', Math.random() * Math.PI * 2);
-
-    // Drifting leftward at autoWalkSpeed * 1.5
-    (powerup.body as Phaser.Physics.Arcade.Body)?.setVelocityX(-Robot.AUTO_WALK_SPEED * 1.5);
+    (powerup.body as Phaser.Physics.Arcade.Body | null)?.setVelocityX(-Robot.AUTO_WALK_SPEED * 1.5);
   }
 
-  private updatePowerupSinusoidalDrift(time: number): void {
-    this.powerupsGroup.getChildren().forEach((child) => {
+  private updatePowerupDrift(time: number): void {
+    for (const child of this.powerupsGroup.getChildren()) {
       const powerup = child as Phaser.Physics.Arcade.Sprite;
-      if (powerup.active) {
-        const baseY = powerup.getData('baseY') as number;
-        const phase = (powerup.getData('phaseOffset') as number) || 0;
-        // Sinusoidal vertical bobbing
-        powerup.y = baseY + Math.sin(time * 0.0035 + phase) * 32;
-        // Maintain leftward velocity
-        (powerup.body as Phaser.Physics.Arcade.Body)?.setVelocityX(-Robot.AUTO_WALK_SPEED * 1.5);
+      if (!powerup.active) continue;
+      const baseY = powerup.getData('baseY') as number;
+      const phase = (powerup.getData('phaseOffset') as number) || 0;
+      powerup.y = baseY + Math.sin(time * 0.0035 + phase) * 32;
+      (powerup.body as Phaser.Physics.Arcade.Body | null)?.setVelocityX(-Robot.AUTO_WALK_SPEED * 1.5);
+    }
+  }
+
+  private recycleOffscreenEntities(): void {
+    const despawnX = this.cameras.main.scrollX - 250;
+    for (const group of [this.tipsGroup, this.hazardsGroup, this.powerupsGroup]) {
+      for (const child of [...group.getChildren()]) {
+        const sprite = child as Phaser.Physics.Arcade.Sprite;
+        if (sprite.x < despawnX) this.destroyEntity(sprite);
       }
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Collisions
+  // ---------------------------------------------------------------
+
+  private handleCollectTip(tip: Phaser.Physics.Arcade.Sprite): void {
+    if (!tip.active) return;
+    const { x, y } = tip;
+    tip.disableBody(true, true);
+    this.destroyEntity(tip);
+    store.addTips(1);
+    this.floatText(x, y - 10, '+1 ⚙️', '#fbbf24', 15, 600, 28);
+  }
+
+  private handleCollectPowerup(powerup: Phaser.Physics.Arcade.Sprite): void {
+    if (!powerup.active) return;
+    const { x, y } = powerup;
+    const buff = powerup.getData('buffType') as BuffType;
+    powerup.disableBody(true, true);
+    this.destroyEntity(powerup);
+    store.activateBuff(buff, StreetScene.BUFF_DURATION_SEC);
+
+    const labels: Record<BuffType, [string, string]> = {
+      tips: ['2X TIPS! 🌻', '#fbbf24'],
+      balance: ['+50% STABILITY! 🍾', '#34d399'],
+      jump: ['SUPER JUMP & SHIELD! ⚡', '#38bdf8'],
+    };
+    const [text, color] = labels[buff];
+    this.floatText(x, y - 15, text, color, 17, 900, 45, '#18181b');
+  }
+
+  private handleHitHazard(hazard: Phaser.Physics.Arcade.Sprite): void {
+    if (!hazard.active || hazard.getData('hit')) return;
+    hazard.setData('hit', true);
+    const { x, y } = hazard;
+
+    if (store.getState().activeBuff === 'jump') {
+      // Shielded: shatter the hazard instead of stumbling
+      hazard.setTint(0x38bdf8);
+      this.tweens.add({
+        targets: hazard,
+        alpha: 0,
+        y: y - 45,
+        angle: 75,
+        scaleX: 0.6,
+        scaleY: 0.6,
+        duration: 400,
+        ease: 'Cubic.easeIn',
+        onComplete: () => this.destroyEntity(hazard),
+      });
+      this.floatText(x, y - 25, 'SMASHED! ⚡', '#38bdf8', 16, 650, 33, '#082f49');
+      return;
+    }
+
+    hazard.setTint(0xef4444);
+    const hazardType = (hazard.getData('hazardType') as 'crate' | 'puddle' | undefined) ?? 'crate';
+    this.robot.triggerStumble(0.85);
+    store.applyStumblePenalty();
+    this.cameras.main.shake(180, 0.005);
+    eventBus.emit('HAZARD_HIT', { x, y, hazardType });
+    this.floatText(x, y - 25, 'STUMBLE! ⚠️', '#ef4444', 15, 750, 25);
+  }
+
+  private floatText(
+    x: number,
+    y: number,
+    text: string,
+    color: string,
+    size: number,
+    duration: number,
+    rise: number,
+    stroke?: string,
+  ): void {
+    const label = this.add
+      .text(x, y, text, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: `${size}px`,
+        color,
+        fontStyle: 'bold',
+        stroke,
+        strokeThickness: stroke ? 3 : 0,
+      })
+      .setOrigin(0.5, 0.5);
+    this.tweens.add({
+      targets: label,
+      y: y - rise,
+      alpha: 0,
+      duration,
+      ease: 'Power2',
+      onComplete: () => label.destroy(),
     });
   }
 
+  // ---------------------------------------------------------------
+  // Frame loop
+  // ---------------------------------------------------------------
+
   override update(time: number, delta: number): void {
-    if (this.isGameOver || this.isVictory || this.isPaused) return;
+    if (this.isRunOver || this.isPaused) return;
 
     const dt = Math.min(delta / 1000, 0.1);
-
-    // 1. Passive momentum decay
     store.decayMomentum(dt);
 
-    // 2. Gather Inputs
-    const leftDown = Boolean(this.cursors?.left.isDown || this.keyA?.isDown);
-    const rightDown = Boolean(this.cursors?.right.isDown || this.keyD?.isDown);
-    const jumpDown = Boolean(
-      this.cursors?.space?.isDown || this.keySpace?.isDown || this.keyW?.isDown || this.cursors?.up.isDown,
-    );
-
     const inputs: RobotInputs = {
-      left: leftDown,
-      right: rightDown,
-      jump: jumpDown,
+      left: Boolean(this.cursors?.left.isDown || this.keyA?.isDown),
+      right: Boolean(this.cursors?.right.isDown || this.keyD?.isDown),
+      jump: Boolean(
+        this.cursors?.space.isDown || this.keySpace?.isDown || this.keyW?.isDown || this.cursors?.up.isDown,
+      ),
     };
 
-    // 3. Update Robot Entity with a per-frame snapshot of the state it needs
     const state = store.getState();
     const ctx: RobotContext = { activeAct: state.activeAct, activeBuff: state.activeBuff };
     this.robot.update(time, delta, inputs, ctx);
 
-    // 4. Procedural Spawner, Power-Up Wave & Recycling
     this.spawnObstaclesAndTips();
     this.spawnFloatingPowerups(delta);
-    this.updatePowerupSinusoidalDrift(time);
+    this.updatePowerupDrift(time);
     this.recycleOffscreenEntities();
 
-    // 5. Update Parallax Background Layers based on camera position
-    const cameraScrollX = this.cameras.main.scrollX;
+    const scrollX = this.cameras.main.scrollX;
     for (const layer of this.layers) {
-      layer.tileSprite.tilePositionX = cameraScrollX * layer.scrollSpeedFactor;
+      layer.tileSprite.tilePositionX = scrollX * layer.scrollSpeedFactor;
     }
+    store.updateDistance(scrollX);
 
-    // 6. Update Distance Progression in State Store
-    store.updateDistance(cameraScrollX);
-
-    // Auto-collapse audio studio rack once player crosses 1,200px in Act 1 for full-screen view
-    if (!this.hasAutoCollapsedSidebar && store.getState().distanceTraveled >= 1200) {
-      this.hasAutoCollapsedSidebar = true;
-      eventBus.emit('UI_SET_SIDEBAR', { collapsed: true });
-    }
-
-    // 7. Deliver coalesced store updates (at most one per frame), then draw the HUD
+    // One coalesced store notification per frame, then publish telemetry for the HUD
     store.flush();
-    this.updateHUD(this.scale.width);
+    const telemetry: HudTelemetry = {
+      bellowsPressure: this.robot.getBellowsPressure(),
+      stabilityRatio: this.robot.getStabilityRatio(),
+      isStumbling: this.robot.getIsStumbling(),
+      wobbleAngle: this.robot.getWobbleAngle(),
+      stabilityThreshold: this.robot.getDynamicStabilityThreshold(),
+    };
+    this.registry.set(HUD_REGISTRY_KEY, telemetry);
   }
 
+  // ---------------------------------------------------------------
+  // Run lifecycle
+  // ---------------------------------------------------------------
+
   /**
-   * The single restart path. Resumes physics (game over and pause both pause it),
-   * kills every tween so nothing outlives the scene, resets the run, and tells the
-   * audio layer to start over from Act 1.
+   * The single restart path: resumes anything paused, kills every tween so
+   * nothing outlives the scene, resets the run, and tells the audio layer to
+   * start over from Act 1.
    */
-  private restartRun(): void {
+  public restartRun(): void {
     if (this.restartRequested) return;
     this.restartRequested = true;
 
-    this.hidePauseOverlay();
+    this.scene.stop(SceneKeys.Pause);
+    if (this.scene.isPaused()) this.scene.resume();
     this.physics.resume();
     this.tweens.killAll();
     store.setPaused(false);
@@ -966,352 +495,73 @@ export class StreetScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  private handleGameOver(distanceTraveled: number, tips: number): void {
-    if (this.isGameOver || this.isVictory) return;
-    this.isGameOver = true;
+  private endData(outcome: RunOutcome): EndSceneData {
+    const s = store.getState();
+    return {
+      outcome,
+      distanceTraveled: s.distanceTraveled,
+      tips: s.tips,
+      tier: s.momentumTier,
+      tierName: s.tierName,
+      act: s.activeAct,
+      actName: s.actName,
+      elapsedSec: store.getElapsedTime(),
+    };
+  }
 
-    // Pause physics engine
+  private handleGameOver(): void {
+    if (this.isRunOver) return;
+    this.isRunOver = true;
     this.physics.pause();
 
-    // Dramatic passed-out face-plant animation tween
+    // Face-plant, then hand off to the end screen
     this.tweens.add({
       targets: this.robot,
       angle: 85,
-      y: 584,
+      y: StreetScene.GROUND_Y,
       duration: 750,
       ease: 'Bounce.easeOut',
       onComplete: () => {
-        this.showGameOverOverlay(distanceTraveled, tips);
+        this.cameras.main.fade(500, 5, 7, 14);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start(SceneKeys.End, this.endData('gameover'));
+        });
       },
     });
   }
 
-  private showGameOverOverlay(distanceTraveled: number, tips: number): void {
-    const { width, height } = this.scale;
-    const overlay = this.add
-      .container(width / 2, height / 2)
-      .setScrollFactor(0)
-      .setDepth(200);
-
-    // Dark backdrop
-    const backdrop = this.add.graphics();
-    backdrop.fillStyle(0x05070e, 0.88);
-    backdrop.fillRect(-width / 2, -height / 2, width, height);
-
-    // Card frame
-    const card = this.add.graphics();
-    card.fillStyle(0x18181b, 0.96);
-    card.fillRoundedRect(-240, -170, 480, 340, 16);
-    card.lineStyle(2, 0xef4444, 0.9);
-    card.strokeRoundedRect(-240, -170, 480, 340, 16);
-
-    const title = this.add
-      .text(0, -120, 'PASSED OUT IN THE GUTTERS', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '24px',
-        fontStyle: 'bold',
-        color: '#ef4444',
-      })
-      .setOrigin(0.5);
-
-    const desc = this.add
-      .text(
-        0,
-        -75,
-        'The drunken automaton ran out of rhythmic momentum\nand collapsed on the rain-slick cobblestones.',
-        {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '13px',
-          color: '#cbd5e1',
-          align: 'center',
-          lineSpacing: 4,
-        },
-      )
-      .setOrigin(0.5);
-
-    const stats = this.add
-      .text(0, -15, `Distance: ${Math.floor(distanceTraveled)} px   •   Tips Busked: ${tips} 🪙`, {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#fbbf24',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    // Try Again Button
-    const btnContainer = this.add.container(0, 75);
-    const btnGlow = this.add.graphics();
-    btnGlow.fillStyle(0xd97706, 0.25);
-    btnGlow.fillRoundedRect(-140, -26, 280, 52, 26);
-
-    const btnBg = this.add.graphics();
-    btnBg.fillGradientStyle(0xd97706, 0xd97706, 0xb45309, 0x92400e, 1);
-    btnBg.fillRoundedRect(-130, -22, 260, 44, 22);
-    btnBg.lineStyle(2, 0xfde68a, 0.85);
-    btnBg.strokeRoundedRect(-130, -22, 260, 44, 22);
-
-    const btnText = this.add
-      .text(0, 0, '🔄 TRY AGAIN', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-        letterSpacing: 2,
-      })
-      .setOrigin(0.5);
-
-    btnContainer.add([btnGlow, btnBg, btnText]);
-
-    this.tweens.add({
-      targets: [btnGlow, btnBg, btnText],
-      scaleX: 1.04,
-      scaleY: 1.04,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    const hitZone = this.add.zone(0, 75, 260, 44).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    const restartAction = (): void => this.restartRun();
-
-    hitZone.on('pointerdown', restartAction);
-    // Space is also the jump key. Wait for a release, and only after a short delay,
-    // so a player still holding jump at the moment of death cannot skip this screen.
-    this.time.delayedCall(500, () => {
-      if (!this.isGameOver) return;
-      this.input.keyboard?.once('keyup-SPACE', restartAction);
-      this.input.keyboard?.once('keydown-ENTER', restartAction);
-    });
-
-    overlay.add([backdrop, card, title, desc, stats, btnContainer, hitZone]);
-    this.gameOverOverlay = overlay;
-  }
-
   private handleVictory(): void {
-    if (this.isVictory || this.isGameOver) return;
-    this.isVictory = true;
-
-    // Stop robot movement
-    if (this.robot && this.robot.body) {
-      this.robot.body.setVelocity(0, 0);
-    }
-
-    // Fade camera smoothly to warm black, then launch EndScene
+    if (this.isRunOver) return;
+    this.isRunOver = true;
+    this.robot.body.setVelocity(0, 0);
     this.cameras.main.fade(1200, 10, 14, 24);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('EndScene');
+      this.scene.start(SceneKeys.End, this.endData('victory'));
     });
   }
 
   public togglePause(): void {
-    if (this.isGameOver || this.isVictory) return;
+    if (this.isRunOver) return;
     store.togglePause();
   }
 
   private handlePauseChange(paused: boolean): void {
-    if (this.isGameOver || this.isVictory) return;
-    if (this.isPaused === paused) return;
-
+    if (this.isRunOver || this.isPaused === paused) return;
     this.isPaused = paused;
-
     if (paused) {
-      this.physics.pause();
-      this.tweens.pauseAll();
-      this.time.paused = true;
-      this.showPauseOverlay();
+      // scene.pause() freezes update, physics, tweens, and timers together.
+      this.scene.launch(SceneKeys.Pause);
+      this.scene.pause();
     } else {
-      this.physics.resume();
-      this.tweens.resumeAll();
-      this.time.paused = false;
-      this.hidePauseOverlay();
-    }
-  }
-
-  private showPauseOverlay(): void {
-    if (this.pauseOverlay) return;
-
-    const { width, height } = this.scale;
-    const overlay = this.add
-      .container(width / 2, height / 2)
-      .setScrollFactor(0)
-      .setDepth(250);
-
-    // Darkened backdrop
-    const backdrop = this.add.graphics();
-    backdrop.fillStyle(0x05070e, 0.85);
-    backdrop.fillRect(-width / 2, -height / 2, width, height);
-
-    // Card frame
-    const card = this.add.graphics();
-    card.fillStyle(0x18181b, 0.96);
-    card.fillRoundedRect(-240, -165, 480, 330, 16);
-    card.lineStyle(2, 0xf59e0b, 0.9);
-    card.strokeRoundedRect(-240, -165, 480, 330, 16);
-
-    const title = this.add
-      .text(0, -118, 'GAME PAUSED', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '28px',
-        fontStyle: 'bold',
-        color: '#f59e0b',
-        letterSpacing: 2,
-      })
-      .setOrigin(0.5);
-
-    const desc = this.add
-      .text(
-        0,
-        -74,
-        'The automaton rests its weary brass gears.\nRhythm and journey are temporarily suspended.',
-        {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '13px',
-          color: '#cbd5e1',
-          align: 'center',
-          lineSpacing: 4,
-        },
-      )
-      .setOrigin(0.5);
-
-    const state = store.getState();
-    const stats = this.add
-      .text(
-        0,
-        -22,
-        `Act ${state.activeAct}: ${state.actName.toUpperCase()}  •  Distance: ${Math.floor(state.distanceTraveled)} px  •  Tips: ${state.tips} ⚙️`,
-        {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#fbbf24',
-        },
-      )
-      .setOrigin(0.5);
-
-    // 1. Resume Button
-    const btnResumeContainer = this.add.container(0, 32);
-    const resumeGlow = this.add.graphics();
-    resumeGlow.fillStyle(0xd97706, 0.25);
-    resumeGlow.fillRoundedRect(-130, -22, 260, 44, 22);
-
-    const resumeBg = this.add.graphics();
-    resumeBg.fillGradientStyle(0xd97706, 0xd97706, 0xb45309, 0x92400e, 1);
-    resumeBg.fillRoundedRect(-120, -18, 240, 36, 18);
-    resumeBg.lineStyle(2, 0xfde68a, 0.85);
-    resumeBg.strokeRoundedRect(-120, -18, 240, 36, 18);
-
-    const resumeText = this.add
-      .text(0, 0, '▶ RESUME', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '15px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-        letterSpacing: 1.5,
-      })
-      .setOrigin(0.5);
-
-    btnResumeContainer.add([resumeGlow, resumeBg, resumeText]);
-
-    const resumeHit = this.add.zone(0, 32, 240, 36).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    resumeHit.on('pointerdown', () => {
-      store.setPaused(false);
-    });
-
-    // 2. Restart Button
-    const btnRestartContainer = this.add.container(0, 84);
-    const restartBg = this.add.graphics();
-    restartBg.fillStyle(0x27272a, 0.95);
-    restartBg.fillRoundedRect(-120, -18, 240, 36, 18);
-    restartBg.lineStyle(1, 0x71717a, 0.8);
-    restartBg.strokeRoundedRect(-120, -18, 240, 36, 18);
-
-    const restartText = this.add
-      .text(0, 0, '🔄 RESTART JOURNEY', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: '#e4e4e7',
-        letterSpacing: 1,
-      })
-      .setOrigin(0.5);
-
-    btnRestartContainer.add([restartBg, restartText]);
-
-    const restartHit = this.add.zone(0, 84, 240, 36).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    const restartAction = (): void => this.restartRun();
-
-    restartHit.on('pointerdown', restartAction);
-
-    // Keyboard shortcut hint
-    const hint = this.add
-      .text(0, 130, '[P] or [ESC] : Resume   •   [R] : Restart', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#9ca3af',
-      })
-      .setOrigin(0.5);
-
-    const onKeyR = (): void => {
-      if (this.isPaused) restartAction();
-    };
-    this.input.keyboard?.on('keydown-R', onKeyR);
-    overlay.once('destroy', () => {
-      this.input.keyboard?.off('keydown-R', onKeyR);
-    });
-
-    overlay.add([
-      backdrop,
-      card,
-      title,
-      desc,
-      stats,
-      btnResumeContainer,
-      resumeHit,
-      btnRestartContainer,
-      restartHit,
-      hint,
-    ]);
-
-    this.pauseOverlay = overlay;
-  }
-
-  private hidePauseOverlay(): void {
-    if (this.pauseOverlay) {
-      this.pauseOverlay.destroy();
-      this.pauseOverlay = undefined;
+      this.scene.stop(SceneKeys.Pause);
+      this.scene.resume();
     }
   }
 
   private cleanupListeners(): void {
-    if (this.unsubActChange) {
-      this.unsubActChange();
-      this.unsubActChange = undefined;
-    }
-    if (this.unsubGameOver) {
-      this.unsubGameOver();
-      this.unsubGameOver = undefined;
-    }
-    if (this.unsubVictory) {
-      this.unsubVictory();
-      this.unsubVictory = undefined;
-    }
-    if (this.unsubGamePause) {
-      this.unsubGamePause();
-      this.unsubGamePause = undefined;
-    }
-    if (this.gameOverOverlay) {
-      this.gameOverOverlay.destroy();
-      this.gameOverOverlay = undefined;
-    }
-    this.hidePauseOverlay();
-    if (this.keyP) {
-      this.keyP.removeAllListeners();
-    }
-    if (this.keyEsc) {
-      this.keyEsc.removeAllListeners();
-    }
+    for (const off of this.unsubscribers) off();
+    this.unsubscribers = [];
+    this.keyP?.removeAllListeners();
+    this.keyEsc?.removeAllListeners();
   }
 }

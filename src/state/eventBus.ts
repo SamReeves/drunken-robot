@@ -122,11 +122,6 @@ export interface GameEventMap {
   GAME_PAUSE: {
     isPaused: boolean;
   };
-
-  /** Fired to request audio studio sidebar collapse or expansion */
-  UI_SET_SIDEBAR: {
-    collapsed: boolean;
-  };
 }
 
 export type GameEventType = keyof GameEventMap;
