@@ -1,7 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath, URL } from 'node:url';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // Served from whalegames.net/drunken-robot/ (a component of the whalegames app, which holds every static game), so
+  // every built URL carries that prefix. Dev (`vite`) and tests still run at the root.
+  base: command === 'build' ? '/drunken-robot/' : '/',
   resolve: {
     alias: {
       '@audio': fileURLToPath(new URL('./src/audio', import.meta.url)),
@@ -33,4 +36,4 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     environment: 'node',
   },
-});
+}));
